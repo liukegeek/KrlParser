@@ -1,0 +1,23 @@
+#描述文件加载时，加载哪些文件信息
+fileLoadSection:
+  # 以!开头的路径代表忽略，其他路径代表选择.注意，prefix和suffix必须有值，否则会报空指针异常。
+  prefix:
+    - "/am.ini"
+    - "/KRC/R1"
+    - "!/Log Files"
+    - "!/Registry"
+    - "!/C"
+  suffix:
+    - "@SKIP@"  # 值为@SKIP@表示当前项不影响匹配
+
+#进行语法解析时，对那些文件进行解析
+fileParseSection:
+  # 以!开头的路径代表忽略，其他路径代表选择。注意，prefix和suffix必须有值，否则会报空指针异常
+  prefix:
+    - "/KRC/R1"
+    - "!/Log Files"
+    - "!/Registry"
+    - "!/C"
+    - "!am.ini"
+  suffix:
+    - "@SKIP@"  # 值为@SKIP@表示当前项不影响匹配
