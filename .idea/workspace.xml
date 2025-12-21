@@ -5,62 +5,10 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="441c94db-8d38-4ead-9894-353c9b0ad5f0" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/.gitignore" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/MarsCodeWorkspaceAppSettings.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/encodings.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/krl-core/pom.xml" beforeDir="false" afterPath="$PROJECT_DIR$/krl-core/pom.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/krl-web/pom.xml" beforeDir="false" afterPath="$PROJECT_DIR$/krl-web/pom.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/pom.xml" beforeDir="false" afterPath="$PROJECT_DIR$/pom.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/tech/waitforu/AstBuilderVisitor.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/tech/waitforu/CarCallReferenceAnalyze.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/tech/waitforu/KrlZipLoader.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/tech/waitforu/Main.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/tech/waitforu/ModuleParser.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/tech/waitforu/ModuleRepository.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/tech/waitforu/YamlConfigService.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/tech/waitforu/antlr4/krl/krlBaseVisitor.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/tech/waitforu/antlr4/krl/krlLexer.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/tech/waitforu/antlr4/krl/krlParser.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/tech/waitforu/antlr4/krl/krlVisitor.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/tech/waitforu/pojo/Config.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/tech/waitforu/pojo/IgnoreRuleByStr.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/tech/waitforu/pojo/RobotInfo.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/tech/waitforu/pojo/StrRuleConfig.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/tech/waitforu/pojo/ast/AbstractAstNode.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/tech/waitforu/pojo/ast/AstNode.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/tech/waitforu/pojo/ast/KrlBody.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/tech/waitforu/pojo/ast/KrlControlLine.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/tech/waitforu/pojo/ast/KrlRoot.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/tech/waitforu/pojo/ast/declaration/Declaration.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/tech/waitforu/pojo/ast/declaration/DeclarationType.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/tech/waitforu/pojo/ast/expression/AbstractExpression.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/tech/waitforu/pojo/ast/expression/Expression.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/tech/waitforu/pojo/ast/expression/ExpressionType.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/tech/waitforu/pojo/ast/expression/Invocation.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/tech/waitforu/pojo/ast/programunit/AbstractProgramUnit.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/tech/waitforu/pojo/ast/programunit/Callable.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/tech/waitforu/pojo/ast/programunit/DataUnit.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/tech/waitforu/pojo/ast/programunit/FunctionUnit.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/tech/waitforu/pojo/ast/programunit/ProcedureUnit.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/tech/waitforu/pojo/ast/programunit/ProgramUnit.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/tech/waitforu/pojo/ast/programunit/ProgramUnitType.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/tech/waitforu/pojo/ast/statements/AbstractStatement.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/tech/waitforu/pojo/ast/statements/CaseBlock.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/tech/waitforu/pojo/ast/statements/ExpressionStatement.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/tech/waitforu/pojo/ast/statements/LoopStatement.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/tech/waitforu/pojo/ast/statements/Statement.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/tech/waitforu/pojo/ast/statements/StatementType.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/tech/waitforu/pojo/ast/statements/SwitchStatement.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/tech/waitforu/pojo/carcallgraph/CallNode.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/tech/waitforu/pojo/carcallgraph/CarCode.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/tech/waitforu/pojo/carcallgraph/CarReferenceNode.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/tech/waitforu/pojo/carcallgraph/NodeType.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/tech/waitforu/pojo/krl/KrlFile.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/tech/waitforu/pojo/krl/KrlFileType.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/tech/waitforu/pojo/krl/KrlModule.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/tech/waitforu/pojo/krl/RobotInfo.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/config.yml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/krl.g4" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/return.json" beforeDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -124,6 +72,7 @@
     "Application.Main.executor": "Run",
     "Application.YamlConfigService.executor": "Run",
     "Maven.KRLParser [clean].executor": "Run",
+    "Maven.KRLParser [compile].executor": "Run",
     "Maven.KRLParser [org.apache.maven.plugins:maven-clean-plugin:3.2.0:clean].executor": "Run",
     "Maven.KRLParser [org.apache.maven.plugins:maven-install-plugin:3.1.2:install].executor": "Run",
     "Maven.krl-core [clean].executor": "Run",
@@ -319,7 +268,7 @@
       <workItem from="1766320984622" duration="150000" />
       <workItem from="1766321157610" duration="62000" />
       <workItem from="1766321229141" duration="208000" />
-      <workItem from="1766321475246" duration="339000" />
+      <workItem from="1766321475246" duration="2438000" />
     </task>
     <servers />
   </component>

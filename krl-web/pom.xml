@@ -5,35 +5,39 @@
 
     <modelVersion>4.0.0</modelVersion>
 
+    <!-- 设置父项目：KRLParser -->
     <parent>
         <groupId>tech.waitforu</groupId>
         <artifactId>KRLParser</artifactId>
         <version>1.0-SNAPSHOT</version>
     </parent>
 
+    <!-- 设置子项目：krl-web -->
     <artifactId>krl-web</artifactId>
     <packaging>jar</packaging>
 
+    <!-- 依赖管理 -->
     <dependencies>
-        <!-- 推荐用 starter-web -->
+        <!-- 推荐用 starter-web, 包含了 Spring MVC, 用于构建 Web 应用 -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
 
-        <!-- 校验 -->
+        <!-- 校验器, 用于校验请求参数 -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-validation</artifactId>
         </dependency>
 
-        <!-- 引用核心模块 -->
+        <!-- 引用核心模块, 包含了 KRL 语法解析器 -->
         <dependency>
             <groupId>tech.waitforu</groupId>
             <artifactId>krl-core</artifactId>
             <version>${project.version}</version>
         </dependency>
 
+        <!-- 测试依赖, 包含了 JUnit, Mockito 等测试框架 -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
@@ -43,6 +47,7 @@
 
     <build>
         <plugins>
+            <!-- 打包插件, 用于打包 Spring Boot 应用 -->
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>

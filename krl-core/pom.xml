@@ -5,31 +5,35 @@
 
     <modelVersion>4.0.0</modelVersion>
 
+    <!-- 设置父项目：KRLParser -->
     <parent>
         <groupId>tech.waitforu</groupId>
         <artifactId>KRLParser</artifactId>
         <version>1.0-SNAPSHOT</version>
     </parent>
 
+    <!-- 设置子项目：krl-core -->
     <artifactId>krl-core</artifactId>
     <packaging>jar</packaging>
 
     <dependencies>
+        <!-- ANTLR 4 用于解析 KRL 语法 -->
         <dependency>
             <groupId>org.antlr</groupId>
             <artifactId>antlr4</artifactId>
         </dependency>
 
-        <dependency>
-            <groupId>tools.jackson.core</groupId>
-            <artifactId>jackson-databind</artifactId>
-        </dependency>
+<!--        <dependency>-->
+<!--            <groupId>tools.jackson.core</groupId>-->
+<!--            <artifactId>jackson-databind</artifactId>-->
+<!--        </dependency>-->
+<!--        -->
+<!--        <dependency>-->
+<!--            <groupId>tools.jackson.dataformat</groupId>-->
+<!--            <artifactId>jackson-dataformat-yaml</artifactId>-->
+<!--        </dependency>-->
 
-        <dependency>
-            <groupId>tools.jackson.dataformat</groupId>
-            <artifactId>jackson-dataformat-yaml</artifactId>
-        </dependency>
-
+        <!-- Ini4j 用于解析 INI 文件 -->
         <dependency>
             <groupId>org.ini4j</groupId>
             <artifactId>ini4j</artifactId>

@@ -3,18 +3,20 @@
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
 
+    <!-- 根项目设置: groupId, artifactId, version, packaging -->
     <modelVersion>4.0.0</modelVersion>
-
     <groupId>tech.waitforu</groupId>
     <artifactId>KRLParser</artifactId>
     <version>1.0-SNAPSHOT</version>
     <packaging>pom</packaging>
 
+    <!-- 子模块列表 -->
     <modules>
         <module>krl-core</module>
         <module>krl-web</module>
     </modules>
 
+    <!-- 子模块属性 -->
     <properties>
         <java.version>21</java.version>
         <maven.compiler.release>${java.version}</maven.compiler.release>
@@ -40,19 +42,21 @@
                 <scope>import</scope>
             </dependency>
 
-            <!-- 你项目里的固定依赖版本 -->
+            <!-- 项目里的固定依赖版本 -->
             <dependency>
                 <groupId>org.antlr</groupId>
                 <artifactId>antlr4</artifactId>
                 <version>${antlr4.version}</version>
             </dependency>
 
+            <!-- Jackson 版本（你现在是 3.0.3） -->
             <dependency>
                 <groupId>tools.jackson.core</groupId>
                 <artifactId>jackson-databind</artifactId>
                 <version>${jackson.version}</version>
             </dependency>
 
+            <!-- Jackson YAML 格式支持 -->
             <dependency>
                 <groupId>tools.jackson.dataformat</groupId>
                 <artifactId>jackson-dataformat-yaml</artifactId>
@@ -65,6 +69,7 @@
         <!-- 统一编译目标为 Java 21，所有子模块继承 -->
         <pluginManagement>
             <plugins>
+                <!-- 编译插件：设置 Java 21 编译 -->
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-compiler-plugin</artifactId>
