@@ -1,0 +1,13 @@
+package tech.waitforu.krlweb;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+@SpringBootApplication
+public class KrlWebApplication {
+
+    public static void main(String[] args) {
+        SpringApplication.run(KrlWebApplication.class, args);
+    }
+
+}

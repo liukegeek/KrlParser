@@ -2,40 +2,136 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>tech.waitforu</groupId>
     <artifactId>KRLParser</artifactId>
     <version>1.0-SNAPSHOT</version>
+    <packaging>pom</packaging>
+
+    <modules>
+        <module>krl-core</module>
+        <module>krl-web</module>
+    </modules>
 
     <properties>
-        <maven.compiler.source>24</maven.compiler.source>
-        <maven.compiler.target>24</maven.compiler.target>
+        <java.version>21</java.version>
+        <maven.compiler.release>${java.version}</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+
+        <!-- 统一版本，子模块直接用这些变量 -->
+        <antlr4.version>4.13.2</antlr4.version>
+        <jackson.version>3.0.3</jackson.version>
+
+        <!-- Spring Boot 版本（你现在是 4.0.1） -->
+        <spring-boot.version>4.0.1</spring-boot.version>
     </properties>
 
-    <dependencies>
-        <!-- https://mvnrepository.com/artifact/org.antlr/antlr4 -->
-        <dependency>
-            <groupId>org.antlr</groupId>
-            <artifactId>antlr4</artifactId>
-            <version>4.13.2</version>
-        </dependency>
+    <!-- 统一依赖版本管理：子模块不需要写 version -->
+    <dependencyManagement>
+        <dependencies>
+            <!-- Spring Boot BOM：让 krl-web 不需要用 spring-boot-starter-parent -->
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-dependencies</artifactId>
+                <version>${spring-boot.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
 
-        <!--jackson-->
-        <!-- https://mvnrepository.com/artifact/tools.jackson.core/jackson-databind -->
-        <dependency>
-            <groupId>tools.jackson.core</groupId>
-            <artifactId>jackson-databind</artifactId>
-            <version>3.0.3</version>
-        </dependency>
+            <!-- 你项目里的固定依赖版本 -->
+            <dependency>
+                <groupId>org.antlr</groupId>
+                <artifactId>antlr4</artifactId>
+                <version>${antlr4.version}</version>
+            </dependency>
 
-        <!-- https://mvnrepository.com/artifact/tools.jackson.dataformat/jackson-dataformat-yaml -->
-        <dependency>
-            <groupId>tools.jackson.dataformat</groupId>
-            <artifactId>jackson-dataformat-yaml</artifactId>
-            <version>3.0.3</version>
-        </dependency>
-    </dependencies>
+            <dependency>
+                <groupId>tools.jackson.core</groupId>
+                <artifactId>jackson-databind</artifactId>
+                <version>${jackson.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>tools.jackson.dataformat</groupId>
+                <artifactId>jackson-dataformat-yaml</artifactId>
+                <version>${jackson.version}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <build>
+        <!-- 统一编译目标为 Java 21，所有子模块继承 -->
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-compiler-plugin</artifactId>
+                    <version>3.13.0</version>
+                    <configuration>
+                        <release>${maven.compiler.release}</release>
+                        <encoding>${project.build.sourceEncoding}</encoding>
+                    </configuration>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+    </build>
 
 </project>
+
+
+
+
+        <!--<?xml version="1.0" encoding="UTF-8"?>-->
+<!--<project xmlns="http://maven.apache.org/POM/4.0.0"-->
+<!--         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"-->
+<!--         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">-->
+<!--    <modelVersion>4.0.0</modelVersion>-->
+
+<!--    <groupId>tech.waitforu</groupId>-->
+<!--    <artifactId>KRLParser</artifactId>-->
+<!--    <version>1.0-SNAPSHOT</version>-->
+<!--    <packaging>pom</packaging>-->
+<!--    <modules>-->
+<!--        <module>krl-core</module>-->
+<!--    </modules>-->
+
+<!--    <properties>-->
+<!--        <maven.compiler.source>24</maven.compiler.source>-->
+<!--        <maven.compiler.target>24</maven.compiler.target>-->
+<!--        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>-->
+<!--    </properties>-->
+
+<!--    <dependencies>-->
+<!--        &lt;!&ndash; https://mvnrepository.com/artifact/org.antlr/antlr4 &ndash;&gt;-->
+<!--        <dependency>-->
+<!--            <groupId>org.antlr</groupId>-->
+<!--            <artifactId>antlr4</artifactId>-->
+<!--            <version>4.13.2</version>-->
+<!--        </dependency>-->
+
+<!--        &lt;!&ndash;jackson&ndash;&gt;-->
+<!--        &lt;!&ndash; https://mvnrepository.com/artifact/tools.jackson.core/jackson-databind &ndash;&gt;-->
+<!--        <dependency>-->
+<!--            <groupId>tools.jackson.core</groupId>-->
+<!--            <artifactId>jackson-databind</artifactId>-->
+<!--            <version>3.0.3</version>-->
+<!--        </dependency>-->
+
+<!--        &lt;!&ndash; https://mvnrepository.com/artifact/tools.jackson.dataformat/jackson-dataformat-yaml &ndash;&gt;-->
+<!--        <dependency>-->
+<!--            <groupId>tools.jackson.dataformat</groupId>-->
+<!--            <artifactId>jackson-dataformat-yaml</artifactId>-->
+<!--            <version>3.0.3</version>-->
+<!--        </dependency>-->
+
+<!--        &lt;!&ndash; https://mvnrepository.com/artifact/org.ini4j/ini4j &ndash;&gt;-->
+<!--        <dependency>-->
+<!--            <groupId>org.ini4j</groupId>-->
+<!--            <artifactId>ini4j</artifactId>-->
+<!--            <version>0.5.4</version>-->
+<!--        </dependency>-->
+<!--    </dependencies>-->
+
+<!--</project>-->
