@@ -23,21 +23,22 @@
             <artifactId>antlr4</artifactId>
         </dependency>
 
-<!--        <dependency>-->
-<!--            <groupId>tools.jackson.core</groupId>-->
-<!--            <artifactId>jackson-databind</artifactId>-->
-<!--        </dependency>-->
-<!--        -->
-<!--        <dependency>-->
-<!--            <groupId>tools.jackson.dataformat</groupId>-->
-<!--            <artifactId>jackson-dataformat-yaml</artifactId>-->
-<!--        </dependency>-->
+        <!-- Jackson 版本分装好的依赖（由SpringBoot自带），版本由 Spring Boot BOM 管理,用于 JSON 序列化和反序列化 -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+        </dependency>
+
+        <!-- Jackson YAML 格式支持，版本由 Spring Boot BOM 管理 -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.dataformat</groupId>
+            <artifactId>jackson-dataformat-yaml</artifactId>
+        </dependency>
 
         <!-- Ini4j 用于解析 INI 文件 -->
         <dependency>
             <groupId>org.ini4j</groupId>
             <artifactId>ini4j</artifactId>
-            <version>0.5.4</version>
         </dependency>
     </dependencies>
 

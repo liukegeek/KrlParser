@@ -209,26 +209,30 @@
               ]
             }
           ]
-        }
-      ],
-      "carCodes": [
+        },
         {
-          "code": "604",
-          "level": "carCode",
-          "callingModule": [
+          "moduleName": "P64",
+          "level":"virtual",
+          "carCodes": [
             {
-              "moduleName": "SA3H604",
-              "level": "carProgram",
+              "code": "604",
+              "level": "carCode",
               "callingModule": [
                 {
-                  "moduleName": "SA3H604_weld_A",
-                  "level": "routeProcess"
-                },
-                {
-                  "moduleName": "SA3H604_weld_B",
-                  "level": "routeProcess"
-                }
+                  "moduleName": "SA3H604",
+                  "level": "carProgram",
+                  "callingModule": [
+                    {
+                      "moduleName": "SA3H604_weld_A",
+                      "level": "routeProcess"
+                    },
+                    {
+                      "moduleName": "SA3H604_weld_B",
+                      "level": "routeProcess"
+                    }
 
+                  ]
+                }
               ]
             }
           ]

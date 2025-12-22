@@ -23,6 +23,7 @@ import tech.waitforu.pojo.krl.KrlFile;
 import tech.waitforu.pojo.krl.KrlModule;
 import tech.waitforu.rule.IgnoreRuleByStr;
 
+import java.io.IOException;
 import java.util.List;
 
 /**
@@ -311,7 +312,12 @@ public class CarCallReferenceAnalyze {
 
     public static void main(String[] args) {
         YamlConfigLoad yamlConfigLoad = new YamlConfigLoad("/Users/liuke/IdeaProjects/KRLParser/src/main/resources/config.yml");
-        Config config = yamlConfigLoad.loadConfig(new Config());
+        Config config = null;
+        try {
+             config = yamlConfigLoad.loadConfig(new Config());
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
         IgnoreRuleByStr fileLoadRule = new IgnoreRuleByStr(config.getFileLoadSection());
         IgnoreRuleByStr invokerParseRule = new IgnoreRuleByStr(config.getInvokerParseSection());
         String zipFilePath = "/Desktop/EC010_L1.zip";
