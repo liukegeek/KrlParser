@@ -10,7 +10,7 @@ import java.io.IOException;
 /**
  * ClassName: loader.tech.waitforu.YamlConfigLoad
  * Package: tech.waitforu
- * Description:
+ * Description: 用于加载 YAML 格式的配置文件
  * Author: LiuKe
  * Create: 2025/12/10 15:39
  * Version 1.0

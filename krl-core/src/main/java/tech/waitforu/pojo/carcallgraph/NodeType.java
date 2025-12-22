@@ -9,7 +9,6 @@ package tech.waitforu.pojo.carcallgraph;
  * Version 1.0   
 */
 public enum NodeType {
-    ROBOT,//机器人信息
     CEll, //cell程序
     CAR_CODE,//车型代码结点
     P_PROGRAM, //P程序
