@@ -66,20 +66,4 @@ public class CarCallAnalysisService {
                 callGraphRoot
         );
     }
-
-    public static void main(String[] args) {
-        CarCallAnalysisService carCallAnalysisService = new CarCallAnalysisService();
-
-        ObjectMapper objectMapper = new ObjectMapper();
-
-        try {
-            RobotInfo robotInfo = carCallAnalysisService.analyze("/Desktop/EC010_L1.zip", "/Users/liuke/IdeaProjects/KRLParser/krl-core/src/main/resources/config.yml");
-            String robotInfoJson = objectMapper.writeValueAsString(robotInfo);
-            System.out.println(robotInfoJson);
-
-
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
 }

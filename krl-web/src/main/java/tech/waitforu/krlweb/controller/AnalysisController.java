@@ -8,6 +8,7 @@ import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
+import tech.waitforu.pojo.krl.RobotInfo;
 import tech.waitforu.service.CarCallAnalysisResult;
 import tech.waitforu.service.CarCallAnalysisService;
 
@@ -25,7 +26,7 @@ public class AnalysisController {
     }
 
     @PostMapping(value = "/analysis", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public CarCallAnalysisResult analyze(@RequestPart("file") MultipartFile file) {
+    public RobotInfo analyze(@RequestPart("file") MultipartFile file) {
         if (file == null || file.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "请上传备份压缩包");
         }
@@ -39,7 +40,8 @@ public class AnalysisController {
         }
 
         try {
-            return carCallAnalysisService.analyze(tempFile.toString());
+            //调用服务分析机器人调用图
+            return null;
         } finally {
             try {
                 Files.deleteIfExists(tempFile);
