@@ -1,129 +1,166 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>KUKA 调用关系图分析</title>
-    <link rel="stylesheet" href="styles.css" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link
-      rel="preconnect"
-      href="https://fonts.gstatic.com"
-      crossorigin
-    />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
-      rel="stylesheet"
-    />
-  </head>
-  <body>
-    <div class="page">
-      <!-- 顶部标题与上传区域 -->
-      <header class="hero">
-        <div>
-          <p class="eyebrow">KUKA KRL 备份解析</p>
-          <h1>调用关系图可视化</h1>
-          <p class="subtitle">
-            上传机器人备份与配置文件，自动解析程序调用链路，并以清晰的调用图呈现。
-          </p>
-        </div>
-        <div class="hero-card">
-          <!-- 上传表单：备份 zip 与配置文件 -->
-          <form id="analysis-form" class="upload-form">
-            <label class="field">
-              <span>备份压缩包 (.zip)</span>
-              <input id="zip-file" type="file" accept=".zip" required />
-            </label>
-            <label class="field">
-              <span>配置文件 (.yml / .yaml)</span>
-              <input id="config-file" type="file" accept=".yml,.yaml" required />
-            </label>
-            <button class="primary" type="submit">
-              开始解析
-            </button>
-            <p id="status" class="status">等待上传文件</p>
-          </form>
-        </div>
-      </header>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KRL Parser - 机器人调用关系分析</title>
 
-      <!-- 主工作区：调用图 + 侧边信息 -->
-      <main class="workspace">
-        <!-- 调用关系图区域（主展示区） -->
-        <section class="graph-section">
-          <div class="legend">
-            <div class="legend-item"><span class="legend-shape cell"></span>Cell 程序</div>
-            <div class="legend-item"><span class="legend-shape p-program"></span>P 程序</div>
-            <div class="legend-item"><span class="legend-shape car-code"></span>车型代码</div>
-            <div class="legend-item"><span class="legend-shape car-program"></span>车型程序</div>
-            <div class="legend-item"><span class="legend-shape route"></span>轨迹程序</div>
-            <div class="legend-item"><span class="legend-shape virtual"></span>虚拟节点</div>
-          </div>
-          <div class="graph-wrapper">
-            <!-- 空状态提示 -->
-            <div class="empty-state" id="empty-state">
-              <h2>尚未生成调用图</h2>
-              <p>上传备份与配置文件后，调用关系图将呈现在此处。</p>
-            </div>
-            <!-- 车型信息：调用关系图 -->
-            <div class="graph-canvas" data-panel="car-info">
-              <svg id="graph" aria-label="调用关系图"></svg>
-            </div>
-            <!-- 线体信息：机器人列表（当前单个机器人时只有一个节点） -->
-            <div class="line-panel" data-panel="line-info" hidden>
-              <div class="line-grid" id="line-grid"></div>
-            </div>
-            <!-- 右下角标签切换 -->
-            <div class="tab-bar">
-              <button class="tab-button is-active" data-tab="car-info">车型信息</button>
-              <button class="tab-button" data-tab="line-info">线体信息</button>
-            </div>
-          </div>
-        </section>
+  <!-- Tailwind CSS (本地加载) -->
+  <script src="vendor/tailwindcss.js"></script>
 
-        <!-- 右侧信息面板：不占主画面空间 -->
-        <aside class="side-panel">
-          <!-- 选中节点信息 -->
-          <div class="info-card">
-            <h3>选中节点</h3>
-            <div class="selected-info">
-              <p id="selected-label">点击节点查看详细信息</p>
-              <p id="selected-type" class="muted"></p>
-              <p id="selected-id" class="muted"></p>
-            </div>
-          </div>
-          <!-- 机器人摘要信息 -->
-          <div class="info-card compact">
-            <h3>机器人摘要</h3>
-            <dl>
-              <div>
-                <dt>机器人名称</dt>
-                <dd id="robot-name">-</dd>
-              </div>
-              <div>
-                <dt>备份日期</dt>
-                <dd id="archive-date">-</dd>
-              </div>
-              <div>
-                <dt>版本号</dt>
-                <dd id="archive-version">-</dd>
-              </div>
-            </dl>
-          </div>
-          <!-- Tech Pack 列表 -->
-          <div class="info-card compact">
-            <h3>已安装 Tech Pack</h3>
-            <ul id="tech-pack-list" class="tag-list">
-              <li class="tag">-</li>
-            </ul>
-          </div>
-        </aside>
-      </main>
+  <!-- Cytoscape.js 图形库 (本地加载) -->
+  <script src="vendor/cytoscape.min.js"></script>
+
+  <!-- Dagre 布局算法依赖 (本地加载) -->
+  <script src="vendor/dagre.min.js"></script>
+  <script src="vendor/cytoscape-dagre.min.js"></script>
+
+  <!-- 图标库 (本地加载) -->
+  <script src="vendor/lucide.js"></script>
+
+  <!-- 自定义样式 -->
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="h-screen w-screen overflow-hidden text-slate-700 font-sans selection:bg-indigo-100 bg-slate-50">
+
+<!-- 顶部导航栏 -->
+<header class="absolute top-0 left-0 right-0 h-16 bg-white/80 backdrop-blur-md border-b border-slate-200 z-40 flex items-center justify-between px-6 shadow-sm">
+  <div class="flex items-center gap-3">
+    <div class="bg-indigo-600 p-2 rounded-lg shadow-indigo-200 shadow-md">
+      <i data-lucide="bot" class="text-white w-6 h-6"></i>
+    </div>
+    <div>
+      <h1 class="font-bold text-xl text-slate-800 tracking-tight">KRL Parser</h1>
+      <p class="text-xs text-slate-500 font-medium">机器人代码深度分析工具</p>
+    </div>
+  </div>
+
+  <div class="flex items-center gap-3">
+    <!-- 侧边栏开关按钮 (移动到了顶部方便操作) -->
+    <button id="btnToggleInfo" class="flex items-center gap-2 px-3 py-2 text-slate-600 hover:bg-slate-100 rounded-md transition-colors text-sm font-medium">
+      <i data-lucide="info" class="w-4 h-4"></i>
+      信息
+    </button>
+
+    <div class="h-6 w-px bg-slate-200 mx-1"></div>
+
+    <!-- 文件上传 -->
+    <div class="file-input-wrapper">
+      <button class="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md shadow-md hover:shadow-lg transition-all text-sm font-medium">
+        <i data-lucide="upload-cloud" class="w-4 h-4"></i>
+        上传备份 (.zip)
+      </button>
+      <input type="file" id="fileUpload" accept=".zip" />
     </div>
 
-    <!-- 图渲染依赖 -->
-    <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@dagrejs/dagre@1.0.4/dist/dagre.min.js"></script>
-    <!-- 主逻辑脚本 -->
-    <script src="app.js"></script>
-  </body>
+    <!-- 模拟演示 -->
+    <button onclick="window.simulateUpload()" class="flex items-center gap-2 px-4 py-2 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-md shadow-sm transition-colors text-sm font-medium">
+      <i data-lucide="play-circle" class="w-4 h-4"></i>
+      演示数据
+    </button>
+  </div>
+</header>
+
+<!-- 主内容区域 -->
+<main class="relative w-full h-full pt-16 flex">
+
+  <!-- 机器人详情侧边栏 (默认隐藏) -->
+  <aside id="infoSidebar" class="absolute left-4 top-20 w-72 bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-slate-100 z-30 transform transition-all duration-300 -translate-x-[120%] opacity-0 flex flex-col max-h-[calc(100vh-6rem)] overflow-hidden">
+    <!-- 头部 -->
+    <div class="p-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+      <h2 class="font-bold text-slate-800 text-sm flex items-center gap-2">
+        <span class="w-2 h-2 rounded-full bg-green-500"></span>
+        机器人档案
+      </h2>
+      <button onclick="window.toggleSidebar(false)" class="text-slate-400 hover:text-slate-600 transition-colors">
+        <i data-lucide="x" class="w-4 h-4"></i>
+      </button>
+    </div>
+
+    <!-- 内容区 -->
+    <div class="p-4 overflow-y-auto custom-scrollbar space-y-5">
+      <!-- 核心参数 -->
+      <div class="text-center py-2">
+        <div class="text-xs text-slate-400 uppercase tracking-widest mb-1">Robot Name</div>
+        <div id="metaName" class="text-xl font-black text-indigo-900 tracking-tight break-all">--</div>
+      </div>
+
+      <div class="grid grid-cols-1 gap-2 text-sm">
+        <div class="bg-slate-50 p-2 rounded border border-slate-100 flex justify-between items-center">
+          <span class="text-slate-400 text-xs">Version</span>
+          <span id="metaVersion" class="font-mono font-medium text-slate-700">--</span>
+        </div>
+        <div class="bg-slate-50 p-2 rounded border border-slate-100 flex flex-col gap-1">
+          <span class="text-slate-400 text-xs">Archive Date</span>
+          <span id="metaDate" class="font-mono font-medium text-slate-700 text-xs break-words">--</span>
+        </div>
+      </div>
+
+      <!-- Tech Packs -->
+      <div>
+        <div class="flex items-center justify-between mb-2">
+          <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Installed Packages</h3>
+          <span id="techPackCount" class="bg-indigo-100 text-indigo-600 text-[10px] px-1.5 py-0.5 rounded-full font-bold">0</span>
+        </div>
+        <div id="techPackList" class="space-y-1.5 max-h-48 overflow-y-auto pr-1 custom-scrollbar">
+          <!-- JS 注入 -->
+          <div class="text-xs text-slate-300 italic text-center py-4">暂无数据</div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- 画布容器 -->
+  <div id="cy" class="w-full h-full cursor-grab active:cursor-grabbing"></div>
+
+  <!-- 视图切换器 (右下角) -->
+  <div class="absolute bottom-6 right-6 z-30 bg-white/90 backdrop-blur rounded-full shadow-xl border border-slate-200 p-1 flex gap-1">
+    <button id="btnLineView" onclick="window.switchView('line')" class="view-btn flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold transition-all text-slate-500 hover:bg-slate-100">
+      <i data-lucide="network" class="w-3 h-3"></i>
+      线体概览
+    </button>
+    <button id="btnCarView" onclick="window.switchView('car')" class="view-btn active flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold transition-all bg-indigo-600 text-white shadow-md">
+      <i data-lucide="git-graph" class="w-3 h-3"></i>
+      调用关系
+    </button>
+  </div>
+
+  <!-- 节点图例 (左下角) -->
+  <div class="absolute bottom-6 left-6 z-20 pointer-events-none">
+    <div class="bg-white/90 backdrop-blur border border-slate-200 p-3 rounded-xl shadow-lg shadow-slate-200/50 text-xs space-y-2 pointer-events-auto min-w-[160px]">
+      <div class="font-bold text-slate-400 mb-2 uppercase tracking-wider text-[10px]">Node Legend</div>
+      <div class="flex items-center gap-2">
+        <span class="w-3 h-3 rounded-full bg-rose-500 shadow-sm shadow-rose-200 block"></span>
+        <span class="font-medium text-slate-600">CELL / 入口点</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="w-3 h-3 rounded bg-indigo-500 shadow-sm shadow-indigo-200 block"></span>
+        <span class="font-medium text-slate-600">普通 SRC 程序</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="w-3 h-3 rounded bg-amber-400 shadow-sm shadow-amber-200 block"></span>
+        <span class="font-medium text-slate-600">路由/过程</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="w-3 h-3 rounded bg-slate-300 block"></span>
+        <span class="font-medium text-slate-600">其他</span>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<!-- Loading 遮罩 -->
+<div id="loader" class="fixed inset-0 bg-white/90 backdrop-blur-sm z-50 hidden flex-col items-center justify-center transition-opacity duration-300">
+  <div class="relative">
+    <div class="w-12 h-12 border-4 border-indigo-200 rounded-full animate-spin"></div>
+    <div class="w-12 h-12 border-4 border-indigo-600 rounded-full animate-spin absolute top-0 left-0 border-t-transparent border-r-transparent"></div>
+  </div>
+  <p class="text-indigo-900 font-bold mt-4 tracking-wide">ANALYZING KRL...</p>
+  <p class="text-slate-400 text-xs mt-1">Generating call graph topology</p>
+</div>
+
+<!-- 脚本逻辑 -->
+<script src="app.js"></script>
+</body>
 </html>

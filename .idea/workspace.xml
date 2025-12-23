@@ -6,7 +6,9 @@
   <component name="ChangeListManager">
     <list default="true" id="441c94db-8d38-4ead-9894-353c9b0ad5f0" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/krl-web/src/main/resources/application.properties" beforeDir="false" afterPath="$PROJECT_DIR$/krl-web/src/main/resources/application.properties" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/krl-web/src/main/resources/static/app.js" beforeDir="false" afterPath="$PROJECT_DIR$/krl-web/src/main/resources/static/app.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/krl-web/src/main/resources/static/index.html" beforeDir="false" afterPath="$PROJECT_DIR$/krl-web/src/main/resources/static/index.html" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/krl-web/src/main/resources/static/styles.css" beforeDir="false" afterPath="$PROJECT_DIR$/krl-web/src/main/resources/static/styles.css" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />

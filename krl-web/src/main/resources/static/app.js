@@ -1,484 +1,483 @@
-// 表单与基础区域元素
-const form = document.getElementById("analysis-form");
-const zipInput = document.getElementById("zip-file");
-const configInput = document.getElementById("config-file");
-const statusEl = document.getElementById("status");
-const emptyState = document.getElementById("empty-state");
-const graphSvg = document.getElementById("graph");
-const graphWrapper = document.querySelector(".graph-wrapper");
-const tabButtons = document.querySelectorAll(".tab-button");
-const tabPanels = document.querySelectorAll("[data-panel]");
-const lineGrid = document.getElementById("line-grid");
+// -------------------------------------------------------------------------
+// 1. 初始化与插件注册
+// -------------------------------------------------------------------------
 
-// 机器人摘要信息
-const robotNameEl = document.getElementById("robot-name");
-const archiveDateEl = document.getElementById("archive-date");
-const archiveVersionEl = document.getElementById("archive-version");
-const techPackListEl = document.getElementById("tech-pack-list");
+// 初始化图标库
+lucide.createIcons();
 
-// 选中节点信息
-const selectedLabelEl = document.getElementById("selected-label");
-const selectedTypeEl = document.getElementById("selected-type");
-const selectedIdEl = document.getElementById("selected-id");
-
-// 用于文本测量，控制节点大小
-const ctx = document.createElement("canvas").getContext("2d");
-ctx.font = "600 13px Inter";
-
-// 当前图状态与机器人信息
-let graphState = null;
-let currentRobotInfo = null;
-
-// 节点类型 -> 样式映射（统一为圆形/圆角矩形）
-const nodeStyles = {
-  CELL: { className: "node--cell", shape: "circle" },
-  CEll: { className: "node--cell", shape: "circle" },
-  CAR_CODE: { className: "node--car-code", shape: "circle" },
-  P_PROGRAM: { className: "node--p-program", shape: "rounded" },
-  CAR_PROGRAM: { className: "node--car-program", shape: "rounded" },
-  ROUTE_PROCESS: { className: "node--route", shape: "rounded" },
-  VIRTUAL: { className: "node--virtual", shape: "rounded" }
-};
-
-// 统一节点类型的大小写
-const normalizeType = (type) => (type ? String(type).toUpperCase() : "UNKNOWN");
-
-// 更新状态提示
-const setStatus = (message, type = "info") => {
-  statusEl.textContent = message;
-  statusEl.className = `status ${type === "error" ? "error" : type === "success" ? "success" : ""}`;
-};
-
-// 渲染机器人摘要信息
-const setRobotInfo = (info) => {
-  robotNameEl.textContent = info?.robotName || "-";
-  archiveDateEl.textContent = info?.archiveDate || "-";
-  archiveVersionEl.textContent = info?.version || "-";
-
-  techPackListEl.innerHTML = "";
-  const packs = info?.techPackList?.length ? info.techPackList : ["-"];
-  packs.forEach((pack) => {
-    const item = document.createElement("li");
-    item.className = "tag";
-    item.textContent = pack || "-";
-    techPackListEl.appendChild(item);
-  });
-};
-
-// 渲染选中节点信息
-const setSelectedInfo = (node) => {
-  if (!node) {
-    selectedLabelEl.textContent = "点击节点查看详细信息";
-    selectedTypeEl.textContent = "";
-    selectedIdEl.textContent = "";
-    return;
+// 注册 Cytoscape Dagre 布局插件
+// 这是一个必要的步骤，否则无法使用 'dagre' 布局
+try {
+  if (typeof cytoscapeDagre !== 'undefined') {
+    cytoscape.use(cytoscapeDagre);
+    console.log("Cytoscape dagre extension registered.");
   }
-  selectedLabelEl.textContent = node.value || node.id || "-";
-  selectedTypeEl.textContent = `类型：${node.nodeType || "-"}`;
-  selectedIdEl.textContent = `ID：${node.id || "-"}`;
+} catch(e) {
+  console.warn("Cytoscape dagre registration check failed (it might be already registered).", e);
+}
+
+// 全局变量
+let cy = null;
+let currentView = 'car'; // 'line' | 'car'
+let globalRobotData = null; // 存储解析后的完整 RobotInfo 对象
+
+// DOM 元素缓存
+const dom = {
+  cy: document.getElementById('cy'),
+  sidebar: document.getElementById('infoSidebar'),
+  btnToggleInfo: document.getElementById('btnToggleInfo'),
+  loader: document.getElementById('loader'),
+
+  // Meta fields
+  metaName: document.getElementById('metaName'),
+  metaVersion: document.getElementById('metaVersion'),
+  metaDate: document.getElementById('metaDate'),
+  techPackList: document.getElementById('techPackList'),
+  techPackCount: document.getElementById('techPackCount'),
+
+  // View Buttons
+  btnLineView: document.getElementById('btnLineView'),
+  btnCarView: document.getElementById('btnCarView')
 };
 
-// 将节点文字按长度进行折行，避免超出节点形状
-const wrapLabel = (label, maxChars = 12) => {
-  if (!label) {
-    return ["-"];
-  }
-  const text = String(label);
-  const words = text.split(/\s+/);
-  if (words.length === 1) {
-    return text.match(new RegExp(`.{1,${maxChars}}`, "g")) || [text];
-  }
-  const lines = [];
-  let current = "";
-  words.forEach((word) => {
-    const test = current ? `${current} ${word}` : word;
-    if (test.length > maxChars) {
-      if (current) {
-        lines.push(current);
+// -------------------------------------------------------------------------
+// 2. 核心逻辑：数据处理 (Recursive JSON Parsing)
+// -------------------------------------------------------------------------
+
+/**
+ * 将嵌套的 JSON 树结构转换为 Cytoscape 所需的 Nodes 和 Edges 数组
+ * @param {Object} rootNode - JSON 中的 callGraphRoot
+ * @returns {Array} elements - Cytoscape 元素数组
+ */
+function parseGraphData(rootNode) {
+  const elements = [];
+  const addedNodes = new Set(); // 防止重复添加节点
+
+  // 递归遍历函数
+  function traverse(node, parentId = null) {
+    if (!node) return;
+
+    // 1. 添加节点 (如果尚未添加)
+    // 假设 node.id 是唯一的
+    if (!addedNodes.has(node.id)) {
+
+      // 根据 nodeType 决定样式分类
+      // CELL 和 CAR_CODE 为圆形，其他为默认
+      let shapeType = 'normal';
+      if (node.nodeType === 'CEll' || node.nodeType === 'CAR_CODE') {
+        shapeType = 'entry';
+      } else if (node.nodeType === 'ROUTE_PROCESS') {
+        shapeType = 'process';
       }
-      current = word;
-    } else {
-      current = test;
-    }
-  });
-  if (current) {
-    lines.push(current);
-  }
-  return lines;
-};
 
-// 根据文字行计算节点大小
-const measureLabel = (lines) => {
-  const widths = lines.map((line) => ctx.measureText(line).width);
-  const maxWidth = Math.max(...widths, 32);
-  return {
-    width: maxWidth + 32,
-    height: 36 + (lines.length - 1) * 18
-  };
-};
-
-// 遍历 CallNode，收集去重后的节点与边
-const collectGraph = (root) => {
-  if (!root) {
-    return { nodes: new Map(), edges: [] };
-  }
-  const nodes = new Map();
-  const edges = [];
-  const edgeSet = new Set();
-  const stack = [root];
-
-  while (stack.length) {
-    const node = stack.pop();
-    if (!node || !node.id) {
-      continue;
+      elements.push({
+        group: 'nodes',
+        data: {
+          id: node.id,
+          label: node.value, // 显示的名字
+          type: node.nodeType,
+          shapeCategory: shapeType,
+          fullInfo: node.relevantInfo // 存储完整信息供点击查看
+        }
+      });
+      addedNodes.add(node.id);
     }
-    if (!nodes.has(node.id)) {
-      nodes.set(node.id, node);
+
+    // 2. 添加边 (如果有父节点)
+    if (parentId) {
+      // 边的 ID 可以简单组合
+      const edgeId = `${parentId}->${node.id}`;
+      elements.push({
+        group: 'edges',
+        data: {
+          id: edgeId,
+          source: parentId,
+          target: node.id
+        }
+      });
     }
-    const children = node.children || [];
-    children.forEach((child) => {
-      if (!child || !child.id) {
-        return;
-      }
-      const edgeKey = `${node.id}__${child.id}`;
-      if (!edgeSet.has(edgeKey)) {
-        edges.push({ from: node.id, to: child.id });
-        edgeSet.add(edgeKey);
-      }
-      if (!nodes.has(child.id)) {
-        stack.push(child);
-      }
-    });
+
+    // 3. 递归处理子节点
+    if (node.children && node.children.length > 0) {
+      node.children.forEach(child => traverse(child, node.id));
+    }
   }
 
-  return { nodes, edges };
-};
+  // 从根节点开始遍历
+  traverse(rootNode);
+  return elements;
+}
 
-// 使用 dagre 进行布局计算
-const buildLayout = ({ nodes, edges }) => {
-  const g = new dagre.graphlib.Graph();
-  g.setGraph({
-    rankdir: "TB",
-    nodesep: 70,
-    ranksep: 110,
-    marginx: 40,
-    marginy: 40
-  });
-  g.setDefaultEdgeLabel(() => ({}));
+// -------------------------------------------------------------------------
+// 3. Cytoscape 渲染与配置
+// -------------------------------------------------------------------------
 
-  nodes.forEach((node, id) => {
-    const labelLines = wrapLabel(node.value || node.id);
-    const { width, height } = measureLabel(labelLines);
-    const type = normalizeType(node.nodeType);
-    const style = nodeStyles[type] || { className: "", shape: "rect" };
-    let nodeWidth = width;
-    let nodeHeight = height;
-    if (style.shape === "circle") {
-      const diameter = Math.max(width, height, 56);
-      nodeWidth = diameter;
-      nodeHeight = diameter;
-    } else {
-      nodeWidth = Math.max(width, 110);
-      nodeHeight = Math.max(height, 48);
-    }
-    g.setNode(id, {
-      width: nodeWidth,
-      height: nodeHeight,
-      labelLines,
-      type,
-      className: style.className,
-      shape: style.shape
-    });
-  });
+function renderGraph(elements, layoutMode = 'dagre') {
+  // 销毁旧实例
+  if (cy) {
+    cy.destroy();
+  }
 
-  edges.forEach((edge) => {
-    g.setEdge(edge.from, edge.to, { curve: d3.curveMonotoneY });
-  });
+  // 布局配置
+  let layoutConfig;
+  if (layoutMode === 'grid') {
+    layoutConfig = { name: 'grid', rows: 2, padding: 50 };
+  } else {
+    // Dagre 配置 (树状分层)
+    layoutConfig = {
+      name: 'dagre',
+      rankDir: 'TB', // Top to Bottom
+      nodeSep: 60,   // 节点间横向间距
+      rankSep: 100,  // 层级间纵向间距
+      padding: 40,
+      animate: true,
+      animationDuration: 600
+    };
+  }
 
-  dagre.layout(g);
-  return g;
-};
+  cy = cytoscape({
+    container: dom.cy,
+    elements: elements,
+    minZoom: 0.1,
+    maxZoom: 3,
+    wheelSensitivity: 0.2, // 平滑缩放
 
-// 使用 SVG + D3 绘制调用关系图
-const renderGraph = (graph, rawData) => {
-  const svg = d3.select(graphSvg);
-  svg.selectAll("*").remove();
-  const width = graph.graph().width;
-  const height = graph.graph().height;
-  svg.attr("viewBox", `0 0 ${width} ${height}`);
+    layout: layoutConfig,
 
-  // 虚拟节点纹理与箭头 marker
-  const defs = svg.append("defs");
-  defs
-    .append("pattern")
-    .attr("id", "virtualPattern")
-    .attr("patternUnits", "userSpaceOnUse")
-    .attr("width", 8)
-    .attr("height", 8)
-    .append("path")
-    .attr("d", "M0,8 L8,0")
-    .attr("stroke", "rgba(148,163,184,0.6)")
-    .attr("stroke-width", 2);
+    style: [
+      // --- 节点通用样式 ---
+      {
+        selector: 'node',
+        style: {
+          'label': 'data(label)',
+          'text-valign': 'center',
+          'text-halign': 'center',
+          'color': '#fff',
+          'font-size': '12px',
+          'font-weight': 'bold',
+          'text-outline-width': 0,
+          'text-wrap': 'wrap',
+          'text-max-width': '90px',
+          'transition-property': 'background-color, line-color, opacity, width, height',
+          'transition-duration': '0.3s'
+        }
+      },
 
-  defs
-    .append("marker")
-    .attr("id", "arrow")
-    .attr("viewBox", "0 0 12 12")
-    .attr("refX", 10)
-    .attr("refY", 6)
-    .attr("markerWidth", 10)
-    .attr("markerHeight", 10)
-    .attr("orient", "auto-start-reverse")
-    .append("path")
-    .attr("d", "M 0 0 L 12 6 L 0 12 z")
-    .attr("fill", "#1e293b");
+      // --- 样式分类 1: 入口点 (CELL, CAR_CODE) ---
+      // 要求：圆形，鲜艳颜色
+      {
+        selector: 'node[shapeCategory="entry"]',
+        style: {
+          'shape': 'ellipse', // 圆形
+          'width': '70px',
+          'height': '70px',
+          'background-color': '#f43f5e', // Rose-500
+          'border-width': 4,
+          'border-color': '#fda4af', // Rose-300
+          'border-opacity': 0.5,
+          'shadow-blur': 12,
+          'shadow-color': '#f43f5e',
+          'shadow-opacity': 0.3
+        }
+      },
 
-  // 图层：便于整体缩放与平移
-  const zoomLayer = svg.append("g").attr("class", "graph-layer");
-  const zoom = d3
-    .zoom()
-    .scaleExtent([0.55, 2.5])
-    .on("zoom", (event) => {
-      zoomLayer.attr("transform", event.transform);
-    });
-  svg.call(zoom);
+      // --- 样式分类 2: 普通程序 (SRC, P_PROGRAM) ---
+      // 要求：圆角矩形，蓝色系
+      {
+        selector: 'node[shapeCategory="normal"]',
+        style: {
+          'shape': 'round-rectangle',
+          'width': '100px',
+          'height': '40px',
+          'background-color': '#4f46e5', // Indigo-600
+          'border-radius': '8px'
+        }
+      },
 
-  // 使用 dagre 的边点数据生成曲线
-  const edgeData = graph.edges().map((edge) => ({
-    from: edge.v,
-    to: edge.w,
-    points: graph.edge(edge).points || []
-  }));
+      // --- 样式分类 3: 路由/过程 (ROUTE_PROCESS) ---
+      // 要求：圆角，橙色系
+      {
+        selector: 'node[shapeCategory="process"]',
+        style: {
+          'shape': 'round-rectangle',
+          'width': '90px',
+          'height': '40px',
+          'background-color': '#f59e0b', // Amber-500
+        }
+      },
 
-  const links = zoomLayer
-    .append("g")
-    .selectAll("path")
-    .data(edgeData.filter((edge) => edge.points.length))
-    .enter()
-    .append("path")
-    .attr("class", "link")
-    .attr("marker-end", "url(#arrow)")
-    .attr("d", (edge) => d3.line().curve(d3.curveCatmullRom.alpha(0.5))(edge.points));
+      // --- 连线样式 ---
+      {
+        selector: 'edge',
+        style: {
+          'width': 2,
+          'curve-style': 'bezier', // 贝塞尔曲线
+          'line-color': '#cbd5e1', // Slate-300
+          'target-arrow-color': '#94a3b8', // Slate-400
+          'target-arrow-shape': 'triangle',
+          'arrow-scale': 1.0
+        }
+      },
 
-  // 绘制节点
-  const nodes = zoomLayer
-    .append("g")
-    .selectAll("g")
-    .data([...rawData.nodes.values()])
-    .enter()
-    .append("g")
-    .attr("class", (d) => {
-      const layout = graph.node(d.id);
-      return `node ${layout.className || ""}`;
-    })
-    .attr("transform", (d) => {
-      const layout = graph.node(d.id);
-      return `translate(${layout.x}, ${layout.y})`;
-    })
-    .on("click", (event, d) => {
-      event.stopPropagation();
-      highlightNode(d.id);
-    });
+      // --- 交互状态: 高亮 ---
+      {
+        selector: '.highlighted',
+        style: {
+          'background-color': '#0ea5e9', // Sky-500 (Highlighter)
+          'line-color': '#0ea5e9',
+          'target-arrow-color': '#0ea5e9',
+          'z-index': 999
+        }
+      },
 
-  // 绘制节点形状
-  nodes.each(function renderShape(d) {
-    const layout = graph.node(d.id);
-    const group = d3.select(this);
-    const halfWidth = layout.width / 2;
-    const halfHeight = layout.height / 2;
+      // --- 交互状态: 变暗 (非相关) ---
+      {
+        selector: '.dimmed',
+        style: {
+          'opacity': 0.1,
+          'z-index': 0
+        }
+      },
 
-    if (layout.shape === "circle") {
-      group
-        .append("circle")
-        .attr("class", "shape")
-        .attr("r", Math.max(halfWidth, halfHeight));
-    } else {
-      group
-        .append("rect")
-        .attr("class", "shape")
-        .attr("x", -halfWidth)
-        .attr("y", -halfHeight)
-        .attr("width", layout.width)
-        .attr("height", layout.height)
-        .attr("rx", 16)
-        .attr("ry", 16);
-    }
-  });
-
-  // 绘制节点文字
-  nodes.each(function renderText(d) {
-    const layout = graph.node(d.id);
-    const group = d3.select(this);
-    const text = group.append("text").attr("text-anchor", "middle");
-    layout.labelLines.forEach((line, index) => {
-      text
-        .append("tspan")
-        .attr("x", 0)
-        .attr("y", (index - (layout.labelLines.length - 1) / 2) * 16)
-        .text(line);
-    });
+      // --- 线体视图的大节点 ---
+      {
+        selector: 'node[type="ROBOT_ROOT"]',
+        style: {
+          'shape': 'ellipse',
+          'width': '140px',
+          'height': '140px',
+          'background-color': '#ea580c', // Orange-600
+          'font-size': '16px',
+          'border-width': 6,
+          'border-color': '#fed7aa',
+          'text-margin-y': 0
+        }
+      }
+    ]
   });
 
-  // 构建祖先/后代关系映射
-  const adjacency = buildAdjacency(rawData.edges);
+  // 绑定点击事件：高亮链路
+  cy.on('tap', 'node', function(evt){
+    const node = evt.target;
 
-  // 点击高亮：选中 + 祖先 + 后代
-  const highlightNode = (selectedId) => {
-    if (!selectedId) {
-      nodes.classed("is-selected", false).classed("is-ancestor", false).classed("is-descendant", false).classed("is-dimmed", false);
-      links.classed("is-highlighted", false);
-      setSelectedInfo(null);
+    // 线体视图点击跳转
+    if (currentView === 'line' && node.data('type') === 'ROBOT_ROOT') {
+      window.switchView('car');
       return;
     }
 
-    const ancestors = collectRelated(selectedId, adjacency.incoming);
-    const descendants = collectRelated(selectedId, adjacency.outgoing);
-    const related = new Set([selectedId, ...ancestors, ...descendants]);
+    // 普通视图：高亮逻辑
+    // 1. 重置
+    cy.elements().removeClass('dimmed highlighted');
 
-    nodes
-      .classed("is-selected", (d) => d.id === selectedId)
-      .classed("is-ancestor", (d) => ancestors.has(d.id))
-      .classed("is-descendant", (d) => descendants.has(d.id))
-      .classed("is-dimmed", (d) => !related.has(d.id));
+    // 2. 全部变暗
+    cy.elements().addClass('dimmed');
 
-    links.classed("is-highlighted", (edge) => related.has(edge.from) && related.has(edge.to));
+    // 3. 高亮自己 + 邻居 (入度和出度)
+    const connectedEdges = node.connectedEdges();
+    const connectedNodes = connectedEdges.connectedNodes();
 
-    setSelectedInfo(rawData.nodes.get(selectedId));
-  };
+    node.removeClass('dimmed').addClass('highlighted');
+    connectedEdges.removeClass('dimmed').addClass('highlighted');
+    connectedNodes.removeClass('dimmed').addClass('highlighted');
 
-  svg.on("click", () => {
-    highlightNode(null);
+    // 可以在这里拓展：在侧边栏显示 node.data('relevantInfo') 代码片段
+    console.log("Clicked node code:", node.data('fullInfo'));
   });
 
-  // 初始自适应缩放，避免图过小或过大
-  const fitToView = () => {
-    const wrapperRect = graphWrapper.getBoundingClientRect();
-    if (!wrapperRect.width || !wrapperRect.height) {
-      return;
+  // 点击空白处还原
+  cy.on('tap', function(evt){
+    if(evt.target === cy){
+      cy.elements().removeClass('dimmed highlighted');
     }
-    const scale = Math.max(0.65, Math.min(wrapperRect.width / width, wrapperRect.height / height, 1));
-    const translateX = (wrapperRect.width - width * scale) / 2;
-    const translateY = (wrapperRect.height - height * scale) / 2;
-    svg.call(zoom.transform, d3.zoomIdentity.translate(translateX, translateY).scale(scale));
-  };
-
-  fitToView();
-
-  graphState = { highlightNode };
-};
-
-// 构建出入度映射，用于祖先/后代计算
-const buildAdjacency = (edges) => {
-  const outgoing = new Map();
-  const incoming = new Map();
-  edges.forEach((edge) => {
-    if (!outgoing.has(edge.from)) {
-      outgoing.set(edge.from, new Set());
-    }
-    outgoing.get(edge.from).add(edge.to);
-
-    if (!incoming.has(edge.to)) {
-      incoming.set(edge.to, new Set());
-    }
-    incoming.get(edge.to).add(edge.from);
   });
-  return { outgoing, incoming };
+}
+
+// -------------------------------------------------------------------------
+// 4. UI 交互与视图切换
+// -------------------------------------------------------------------------
+
+/**
+ * 切换侧边栏显示状态
+ * @param {boolean} [show] - 强制显示或隐藏，不传则切换
+ */
+window.toggleSidebar = function(show) {
+  if (show === undefined) {
+    dom.sidebar.classList.toggle('show');
+    dom.sidebar.classList.toggle('-translate-x-[120%]');
+  } else if (show) {
+    dom.sidebar.classList.add('show');
+    dom.sidebar.classList.remove('-translate-x-[120%]');
+  } else {
+    dom.sidebar.classList.remove('show');
+    dom.sidebar.classList.add('-translate-x-[120%]');
+  }
 };
 
-// 从起点向上/向下遍历所有关联节点
-const collectRelated = (startId, map) => {
-  const visited = new Set();
-  const queue = [startId];
-  while (queue.length) {
-    const current = queue.shift();
-    const next = map.get(current);
-    if (!next) {
-      continue;
+// 按钮监听
+dom.btnToggleInfo.addEventListener('click', () => window.toggleSidebar());
+
+/**
+ * 切换视图模式 (线体 vs 车型)
+ */
+window.switchView = function(viewName) {
+  if (!globalRobotData) return; // 无数据不切换
+
+  currentView = viewName;
+
+  // 更新按钮样式
+  const btns = [dom.btnLineView, dom.btnCarView];
+  btns.forEach(btn => {
+    if ((viewName === 'line' && btn === dom.btnLineView) || (viewName === 'car' && btn === dom.btnCarView)) {
+      btn.classList.add('bg-indigo-600', 'text-white', 'shadow-md');
+      btn.classList.remove('text-slate-500', 'hover:bg-slate-100');
+    } else {
+      btn.classList.remove('bg-indigo-600', 'text-white', 'shadow-md');
+      btn.classList.add('text-slate-500', 'hover:bg-slate-100');
     }
-    next.forEach((node) => {
-      if (!visited.has(node)) {
-        visited.add(node);
-        queue.push(node);
+  });
+
+  if (viewName === 'line') {
+    // 渲染线体视图：一个代表机器人的大节点
+    const elements = [{
+      group: 'nodes',
+      data: {
+        id: 'root_robot',
+        label: globalRobotData.robotName,
+        type: 'ROBOT_ROOT'
       }
-    });
+    }];
+    renderGraph(elements, 'grid');
+    window.toggleSidebar(false); // 线体视图默认不看详情
+  } else {
+    // 渲染车型视图：复杂的调用图
+    const elements = parseGraphData(globalRobotData.callGraphRoot);
+    renderGraph(elements, 'dagre');
+    window.toggleSidebar(true); // 车型视图自动弹出详情
   }
-  return visited;
 };
 
-// 上传文件并请求后端解析
-form.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  if (!zipInput.files.length || !configInput.files.length) {
-    setStatus("请同时选择备份压缩包与配置文件", "error");
-    return;
-  }
+/**
+ * 更新侧边栏数据
+ */
+function updateSidebarInfo(data) {
+  dom.metaName.textContent = data.robotName || 'Unknown';
+  dom.metaVersion.textContent = data.version || '--';
+  // 简单处理日期格式，去掉秒
+  dom.metaDate.textContent = (data.archiveDate || '').replace(/_/g, ' ');
 
-  const formData = new FormData();
-  formData.append("file", zipInput.files[0]);
-  formData.append("config", configInput.files[0]);
+  // 更新包列表
+  dom.techPackList.innerHTML = '';
+  const packs = data.techPackList || [];
+  dom.techPackCount.textContent = packs.length;
 
-  setStatus("正在解析调用关系...", "info");
-  setSelectedInfo(null);
-
-  try {
-    const response = await fetch("/api/analysis", {
-      method: "POST",
-      body: formData
+  if (packs.length === 0) {
+    dom.techPackList.innerHTML = '<div class="text-xs text-slate-300 italic text-center py-2">No packages installed</div>';
+  } else {
+    packs.forEach(packName => {
+      const div = document.createElement('div');
+      div.className = 'bg-white p-2 rounded border border-slate-100 text-[11px] text-slate-600 font-medium shadow-sm flex items-start gap-2';
+      div.innerHTML = `<i data-lucide="package" class="w-3 h-3 text-indigo-400 mt-0.5 shrink-0"></i> <span>${packName}</span>`;
+      dom.techPackList.appendChild(div);
     });
+    lucide.createIcons(); // 重新渲染新插入的图标
+  }
+}
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error?.message || "解析失败，请检查配置文件与备份包");
-    }
+// -------------------------------------------------------------------------
+// 5. 模拟数据与上传处理
+// -------------------------------------------------------------------------
 
-    const data = await response.json();
-    currentRobotInfo = data;
-    setRobotInfo(data);
-    const graphData = collectGraph(data.callGraphRoot);
-    const layout = buildLayout(graphData);
-    renderGraph(layout, graphData);
-    updateLineInfo([data]);
-    emptyState.style.display = "none";
-    setStatus("解析成功，点击节点查看关联链路", "success");
-  } catch (error) {
-    setStatus(error.message, "error");
+/**
+ * 模拟上传并生成数据 (基于用户提供的 JSON 模版)
+ */
+window.simulateUpload = function() {
+  dom.loader.classList.remove('hidden');
+  dom.loader.classList.add('flex');
+
+  // 模拟网络延迟
+  setTimeout(() => {
+    // 模拟后端返回的 JSON 数据
+    const mockResponse = {
+      "robotName": "EC010_L1",
+      "archiveName": "E:EC010_L1.zip",
+      "archiveDate": "2025-09-23_10-09-02",
+      "version": "V8.6.11 HF1",
+      "techPackList": [
+        "DiagnosisSafety",
+        "KUKA.BoardPackage",
+        "KUKA.Profinet MS",
+        "ServoGunBasic"
+      ],
+      // 简化版的 callGraphRoot，用于演示
+      "callGraphRoot": {
+        "id": "CEll:cell",
+        "value": "cell",
+        "nodeType": "CEll",
+        "relevantInfo": "DEF CELL()...END",
+        "children": [
+          {
+            "id": "P_PROGRAM:p90",
+            "value": "p90",
+            "nodeType": "P_PROGRAM",
+            "relevantInfo": "...",
+            "children": [
+              {
+                "id": "900:0",
+                "value": "900",
+                "nodeType": "CAR_CODE",
+                "relevantInfo": "...",
+                "children": [
+                  {
+                    "id": "CAR_PROGRAM:sghbwp",
+                    "value": "sghbwp",
+                    "nodeType": "CAR_PROGRAM",
+                    "relevantInfo": "...",
+                    "children": [
+                      {
+                        "id": "ROUTE_PROCESS:sgh_weld_a",
+                        "value": "sgh_weld_a",
+                        "nodeType": "ROUTE_PROCESS",
+                        "relevantInfo": "...",
+                        "children": []
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "P_PROGRAM:p92",
+            "value": "p92",
+            "nodeType": "P_PROGRAM",
+            "children": []
+          }
+        ]
+      }
+    };
+
+    // 处理数据
+    globalRobotData = mockResponse;
+    updateSidebarInfo(globalRobotData);
+
+    // 默认进入车型视图
+    window.switchView('car');
+
+    // 隐藏 loading
+    dom.loader.classList.add('opacity-0');
+    setTimeout(() => {
+      dom.loader.classList.remove('flex', 'opacity-0');
+      dom.loader.classList.add('hidden');
+    }, 300); // 等待淡出动画
+
+  }, 1000);
+};
+
+// 监听真实上传 (预留接口)
+document.getElementById('fileUpload').addEventListener('change', (e) => {
+  if (e.target.files.length > 0) {
+    alert("在真实环境中，这里将调用 fetch('/api/analysis', ...) 并将返回的 JSON 传给 globalRobotData");
+    window.simulateUpload(); // 暂时用模拟数据代替
   }
 });
-
-// 线体信息：渲染机器人列表（支持未来多机器人）
-const updateLineInfo = (robots) => {
-  lineGrid.innerHTML = "";
-  const list = robots.length ? robots : [{ robotName: "未知机器人" }];
-  list.forEach((robot) => {
-    const node = document.createElement("div");
-    node.className = "line-node";
-    node.textContent = robot.robotName || "未命名机器人";
-    node.addEventListener("click", () => {
-      switchTab("car-info");
-    });
-    lineGrid.appendChild(node);
-  });
-};
-
-// 标签切换：车型信息 / 线体信息
-const switchTab = (tabId) => {
-  tabButtons.forEach((button) => {
-    button.classList.toggle("is-active", button.dataset.tab === tabId);
-  });
-  tabPanels.forEach((panel) => {
-    panel.hidden = panel.dataset.panel !== tabId;
-  });
-  if (tabId === "car-info" && graphState?.highlightNode) {
-    graphState.highlightNode(null);
-  }
-};
-
-// 绑定标签切换事件
-tabButtons.forEach((button) => {
-  button.addEventListener("click", () => {
-    switchTab(button.dataset.tab);
-  });
-});
-
-// 初始渲染空的线体信息
-updateLineInfo([]);
