@@ -83,7 +83,7 @@
     "RequestMappingsPanelWidth1": "75",
     "RunOnceActivity.ShowReadmeOnStart": "true",
     "RunOnceActivity.git.unshallow": "true",
-    "Spring Boot.KrlWebApplication.executor": "Debug",
+    "Spring Boot.KrlWebApplication.executor": "Run",
     "ToolWindow.ANTLR Preview.ShowToolbar": "false",
     "extract.method.default.visibility": "private",
     "git-widget-placeholder": "main",
@@ -291,8 +291,13 @@
       <breakpoints>
         <line-breakpoint enabled="true" type="java-line">
           <url>file://$PROJECT_DIR$/krl-web/src/main/java/tech/waitforu/krlweb/controller/AnalysisController.java</url>
-          <line>28</line>
-          <option name="timeStamp" value="6" />
+          <line>36</line>
+          <option name="timeStamp" value="11" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="java-line">
+          <url>file://$PROJECT_DIR$/krl-core/src/main/java/tech/waitforu/service/CarCallAnalysisService.java</url>
+          <line>32</line>
+          <option name="timeStamp" value="12" />
         </line-breakpoint>
       </breakpoints>
     </breakpoint-manager>
