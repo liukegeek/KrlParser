@@ -1,166 +1,663 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>KRL Parser - 机器人调用关系分析</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KRL Parser - 机器人调用关系分析</title>
 
-  <!-- Tailwind CSS (本地加载) -->
-  <script src="vendor/tailwindcss.js"></script>
+    <!-- Tailwind CSS -->
+    <script src="vendor/tailwindcss.js"></script>
 
-  <!-- Cytoscape.js 图形库 (本地加载) -->
-  <script src="vendor/cytoscape.min.js"></script>
+    <!-- Cytoscape.js 核心库 -->
+    <script src="vendor/cytoscape.min.js"></script>
 
-  <!-- Dagre 布局算法依赖 (本地加载) -->
-  <script src="vendor/dagre.min.js"></script>
-  <script src="vendor/cytoscape-dagre.min.js"></script>
+    <!-- Cytoscape Dagre 布局依赖 -->
+    <script src="vendor/dagre.min.js"></script>
+    <!-- Cytoscape Dagre 扩展 -->
+    <script src="vendor/cytoscape-dagre.min.js"></script>
 
-  <!-- 图标库 (本地加载) -->
-  <script src="vendor/lucide.js"></script>
+    <!-- Lucide Icons -->
+    <script src="vendor/lucide.js"></script>
 
-  <!-- 自定义样式 -->
-  <link rel="stylesheet" href="styles.css">
+    <style>
+        /* 自定义滚动条 */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 3px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+
+        /* 画布背景网格 */
+        #cy {
+            background-image: radial-gradient(#cbd5e1 1px, transparent 1px);
+            background-size: 20px 20px;
+            background-color: #f8fafc;
+        }
+
+        /* 隐藏 input file */
+        .file-input-wrapper {
+            position: relative;
+            overflow: hidden;
+            display: inline-block;
+        }
+
+        .file-input-wrapper input[type=file] {
+            font-size: 100px;
+            position: absolute;
+            left: 0;
+            top: 0;
+            opacity: 0;
+            cursor: pointer;
+        }
+    </style>
 </head>
-<body class="h-screen w-screen overflow-hidden text-slate-700 font-sans selection:bg-indigo-100 bg-slate-50">
+<body class="h-screen w-screen overflow-hidden text-slate-700 font-sans selection:bg-blue-100">
 
 <!-- 顶部导航栏 -->
-<header class="absolute top-0 left-0 right-0 h-16 bg-white/80 backdrop-blur-md border-b border-slate-200 z-40 flex items-center justify-between px-6 shadow-sm">
-  <div class="flex items-center gap-3">
-    <div class="bg-indigo-600 p-2 rounded-lg shadow-indigo-200 shadow-md">
-      <i data-lucide="bot" class="text-white w-6 h-6"></i>
-    </div>
-    <div>
-      <h1 class="font-bold text-xl text-slate-800 tracking-tight">KRL Parser</h1>
-      <p class="text-xs text-slate-500 font-medium">机器人代码深度分析工具</p>
-    </div>
-  </div>
-
-  <div class="flex items-center gap-3">
-    <!-- 侧边栏开关按钮 (移动到了顶部方便操作) -->
-    <button id="btnToggleInfo" class="flex items-center gap-2 px-3 py-2 text-slate-600 hover:bg-slate-100 rounded-md transition-colors text-sm font-medium">
-      <i data-lucide="info" class="w-4 h-4"></i>
-      信息
-    </button>
-
-    <div class="h-6 w-px bg-slate-200 mx-1"></div>
-
-    <!-- 文件上传 -->
-    <div class="file-input-wrapper">
-      <button class="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md shadow-md hover:shadow-lg transition-all text-sm font-medium">
-        <i data-lucide="upload-cloud" class="w-4 h-4"></i>
-        上传备份 (.zip)
-      </button>
-      <input type="file" id="fileUpload" accept=".zip" />
+<header class="absolute top-0 left-0 right-0 h-16 bg-white/90 backdrop-blur-md border-b border-slate-200 z-40 flex items-center justify-between px-6 shadow-sm">
+    <div class="flex items-center gap-3">
+        <div class="bg-orange-500 p-2 rounded-lg">
+            <i data-lucide="bot" class="text-white w-6 h-6"></i>
+        </div>
+        <div>
+            <h1 class="font-bold text-xl text-slate-800 tracking-tight">KRL Parser <span
+                    class="text-slate-400 font-normal text-sm ml-2">v1.0.0</span></h1>
+            <p class="text-xs text-slate-500">KUKA 机器人备份分析工具</p>
+        </div>
     </div>
 
-    <!-- 模拟演示 -->
-    <button onclick="window.simulateUpload()" class="flex items-center gap-2 px-4 py-2 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-md shadow-sm transition-colors text-sm font-medium">
-      <i data-lucide="play-circle" class="w-4 h-4"></i>
-      演示数据
-    </button>
-  </div>
+    <div class="flex items-center gap-4">
+        <!-- 上传按钮区域 -->
+        <div class="file-input-wrapper">
+            <button class="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md shadow transition-colors text-sm font-medium">
+                <i data-lucide="upload-cloud" class="w-4 h-4"></i>
+                上传备份 (.zip)
+            </button>
+            <input type="file" id="fileUpload" accept=".zip"/>
+        </div>
+
+        <!-- 演示按钮 (为了展示效果，模拟上传) -->
+        <button onclick="simulateUpload()"
+                class="flex items-center gap-2 px-4 py-2 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-md shadow-sm transition-colors text-sm font-medium">
+            <i data-lucide="play-circle" class="w-4 h-4"></i>
+            模拟演示数据
+        </button>
+    </div>
 </header>
 
 <!-- 主内容区域 -->
 <main class="relative w-full h-full pt-16 flex">
 
-  <!-- 机器人详情侧边栏 (默认隐藏) -->
-  <aside id="infoSidebar" class="absolute left-4 top-20 w-72 bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-slate-100 z-30 transform transition-all duration-300 -translate-x-[120%] opacity-0 flex flex-col max-h-[calc(100vh-6rem)] overflow-hidden">
-    <!-- 头部 -->
-    <div class="p-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
-      <h2 class="font-bold text-slate-800 text-sm flex items-center gap-2">
-        <span class="w-2 h-2 rounded-full bg-green-500"></span>
-        机器人档案
-      </h2>
-      <button onclick="window.toggleSidebar(false)" class="text-slate-400 hover:text-slate-600 transition-colors">
-        <i data-lucide="x" class="w-4 h-4"></i>
-      </button>
-    </div>
-
-    <!-- 内容区 -->
-    <div class="p-4 overflow-y-auto custom-scrollbar space-y-5">
-      <!-- 核心参数 -->
-      <div class="text-center py-2">
-        <div class="text-xs text-slate-400 uppercase tracking-widest mb-1">Robot Name</div>
-        <div id="metaName" class="text-xl font-black text-indigo-900 tracking-tight break-all">--</div>
-      </div>
-
-      <div class="grid grid-cols-1 gap-2 text-sm">
-        <div class="bg-slate-50 p-2 rounded border border-slate-100 flex justify-between items-center">
-          <span class="text-slate-400 text-xs">Version</span>
-          <span id="metaVersion" class="font-mono font-medium text-slate-700">--</span>
+    <!-- 左侧信息面板 (可折叠) -->
+    <aside id="infoSidebar"
+           class="absolute left-4 top-20 w-80 bg-white/95 backdrop-blur rounded-xl shadow-xl border border-slate-200 z-30 transform transition-transform duration-300 -translate-x-full opacity-0 pointer-events-none flex flex-col max-h-[calc(100vh-6rem)]">
+        <!-- 面板头部 -->
+        <div class="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50 rounded-t-xl">
+            <h2 class="font-semibold text-slate-800 flex items-center gap-2">
+                <i data-lucide="info" class="w-4 h-4 text-blue-500"></i>
+                机器人详情
+            </h2>
+            <button onclick="toggleSidebar()" class="text-slate-400 hover:text-slate-600">
+                <i data-lucide="x" class="w-4 h-4"></i>
+            </button>
         </div>
-        <div class="bg-slate-50 p-2 rounded border border-slate-100 flex flex-col gap-1">
-          <span class="text-slate-400 text-xs">Archive Date</span>
-          <span id="metaDate" class="font-mono font-medium text-slate-700 text-xs break-words">--</span>
-        </div>
-      </div>
 
-      <!-- Tech Packs -->
-      <div>
-        <div class="flex items-center justify-between mb-2">
-          <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Installed Packages</h3>
-          <span id="techPackCount" class="bg-indigo-100 text-indigo-600 text-[10px] px-1.5 py-0.5 rounded-full font-bold">0</span>
-        </div>
-        <div id="techPackList" class="space-y-1.5 max-h-48 overflow-y-auto pr-1 custom-scrollbar">
-          <!-- JS 注入 -->
-          <div class="text-xs text-slate-300 italic text-center py-4">暂无数据</div>
-        </div>
-      </div>
-    </div>
-  </aside>
+        <!-- 面板内容 -->
+        <div class="p-4 overflow-y-auto space-y-6">
+            <!-- 基本信息 -->
+            <div class="space-y-3">
+                <div class="bg-blue-50 p-3 rounded-lg border border-blue-100">
+                    <span class="text-xs text-blue-500 font-bold uppercase tracking-wider">Robot Name</span>
+                    <div id="metaName" class="text-lg font-bold text-slate-800 break-words">--</div>
+                </div>
 
-  <!-- 画布容器 -->
-  <div id="cy" class="w-full h-full cursor-grab active:cursor-grabbing"></div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div class="bg-slate-50 p-3 rounded-lg border border-slate-100">
+                        <span class="text-xs text-slate-400 uppercase">Serial Nr</span>
+                        <div id="metaSerial" class="font-mono text-sm font-medium text-slate-700">--</div>
+                    </div>
+                    <div class="bg-slate-50 p-3 rounded-lg border border-slate-100">
+                        <span class="text-xs text-slate-400 uppercase">Archive Date</span>
+                        <div id="metaDate" class="font-mono text-sm font-medium text-slate-700">--</div>
+                    </div>
+                </div>
+            </div>
 
-  <!-- 视图切换器 (右下角) -->
-  <div class="absolute bottom-6 right-6 z-30 bg-white/90 backdrop-blur rounded-full shadow-xl border border-slate-200 p-1 flex gap-1">
-    <button id="btnLineView" onclick="window.switchView('line')" class="view-btn flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold transition-all text-slate-500 hover:bg-slate-100">
-      <i data-lucide="network" class="w-3 h-3"></i>
-      线体概览
+            <!-- Tech Packs -->
+            <div>
+                <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Installed Tech Packs</h3>
+                <div id="techPackList" class="space-y-2">
+                    <!-- Tech Packs will be injected here -->
+                    <div class="text-sm text-slate-400 italic">暂无数据</div>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- 侧边栏触发按钮 (当侧边栏隐藏时显示) -->
+    <button id="sidebarTrigger" onclick="toggleSidebar()"
+            class="absolute left-4 top-20 z-20 p-2 bg-white rounded-lg shadow-md border border-slate-200 hover:bg-slate-50 transition-all hidden">
+        <i data-lucide="menu" class="w-5 h-5 text-slate-600"></i>
     </button>
-    <button id="btnCarView" onclick="window.switchView('car')" class="view-btn active flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold transition-all bg-indigo-600 text-white shadow-md">
-      <i data-lucide="git-graph" class="w-3 h-3"></i>
-      调用关系
-    </button>
-  </div>
 
-  <!-- 节点图例 (左下角) -->
-  <div class="absolute bottom-6 left-6 z-20 pointer-events-none">
-    <div class="bg-white/90 backdrop-blur border border-slate-200 p-3 rounded-xl shadow-lg shadow-slate-200/50 text-xs space-y-2 pointer-events-auto min-w-[160px]">
-      <div class="font-bold text-slate-400 mb-2 uppercase tracking-wider text-[10px]">Node Legend</div>
-      <div class="flex items-center gap-2">
-        <span class="w-3 h-3 rounded-full bg-rose-500 shadow-sm shadow-rose-200 block"></span>
-        <span class="font-medium text-slate-600">CELL / 入口点</span>
-      </div>
-      <div class="flex items-center gap-2">
-        <span class="w-3 h-3 rounded bg-indigo-500 shadow-sm shadow-indigo-200 block"></span>
-        <span class="font-medium text-slate-600">普通 SRC 程序</span>
-      </div>
-      <div class="flex items-center gap-2">
-        <span class="w-3 h-3 rounded bg-amber-400 shadow-sm shadow-amber-200 block"></span>
-        <span class="font-medium text-slate-600">路由/过程</span>
-      </div>
-      <div class="flex items-center gap-2">
-        <span class="w-3 h-3 rounded bg-slate-300 block"></span>
-        <span class="font-medium text-slate-600">其他</span>
-      </div>
+    <!-- 图形画布 (Cytoscape) -->
+    <div id="cy" class="w-full h-full cursor-grab active:cursor-grabbing"></div>
+
+    <!-- 视图切换控制台 (右下角) -->
+    <div class="absolute bottom-6 right-6 z-30 bg-white/90 backdrop-blur rounded-full shadow-xl border border-slate-200 p-1.5 flex gap-1">
+        <button id="btnLineView" onclick="switchView('line')"
+                class="flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all text-slate-500 hover:bg-slate-100">
+            <i data-lucide="network" class="w-4 h-4"></i>
+            线体信息
+        </button>
+        <button id="btnCarView" onclick="switchView('car')"
+                class="flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all bg-blue-600 text-white shadow-md">
+            <i data-lucide="git-branch" class="w-4 h-4"></i>
+            车型信息
+        </button>
     </div>
-  </div>
+
+    <!-- 图例/帮助 (左下角) -->
+    <div class="absolute bottom-6 left-6 z-20 pointer-events-none">
+        <div class="bg-white/80 backdrop-blur border border-slate-200 p-3 rounded-lg shadow-sm text-xs space-y-2 pointer-events-auto">
+            <div class="font-bold text-slate-500 mb-1">图例说明</div>
+            <div class="flex items-center gap-2">
+                <span class="w-3 h-3 rounded-full bg-orange-500 inline-block"></span>
+                <span>CELL / 车型代码</span>
+            </div>
+            <div class="flex items-center gap-2">
+                <span class="w-3 h-3 rounded bg-blue-500 inline-block"></span>
+                <span>SRC 程序</span>
+            </div>
+            <div class="flex items-center gap-2">
+                <span class="w-3 h-3 rounded bg-slate-400 inline-block"></span>
+                <span>DAT 数据 / 系统文件</span>
+            </div>
+            <div class="mt-2 pt-2 border-t border-slate-100 text-slate-400">
+                <p>提示：滚动缩放，点击节点高亮链路</p>
+            </div>
+        </div>
+    </div>
 
 </main>
 
-<!-- Loading 遮罩 -->
-<div id="loader" class="fixed inset-0 bg-white/90 backdrop-blur-sm z-50 hidden flex-col items-center justify-center transition-opacity duration-300">
-  <div class="relative">
-    <div class="w-12 h-12 border-4 border-indigo-200 rounded-full animate-spin"></div>
-    <div class="w-12 h-12 border-4 border-indigo-600 rounded-full animate-spin absolute top-0 left-0 border-t-transparent border-r-transparent"></div>
-  </div>
-  <p class="text-indigo-900 font-bold mt-4 tracking-wide">ANALYZING KRL...</p>
-  <p class="text-slate-400 text-xs mt-1">Generating call graph topology</p>
+<!-- 加载中遮罩 -->
+<div id="loader" class="fixed inset-0 bg-white/80 backdrop-blur-sm z-50 hidden flex-col items-center justify-center">
+    <div class="animate-spin text-blue-600 mb-4">
+        <i data-lucide="loader-2" class="w-10 h-10"></i>
+    </div>
+    <p class="text-slate-600 font-medium">正在解析 KRL 代码结构...</p>
 </div>
 
-<!-- 脚本逻辑 -->
-<script src="app.js"></script>
+<script>
+    // 初始化图标
+    lucide.createIcons();
+
+    // -------------------------------------------------------------------------
+    // 关键修复：显式注册 Dagre 插件
+    // -------------------------------------------------------------------------
+    try {
+        if (typeof cytoscapeDagre !== 'undefined') {
+            cytoscape.use(cytoscapeDagre);
+            console.log("Cytoscape dagre extension registered.");
+        } else {
+            console.warn("Cytoscape dagre extension global variable not found.");
+        }
+    } catch (e) {
+        console.error("Error registering dagre extension:", e);
+    }
+
+    // 全局状态
+    let cy = null;
+    let currentView = 'car'; // 'line' | 'car'
+    let parsedData = null; // 存储解析后的 RobotInfo
+
+    // DOM 元素引用
+    const dom = {
+        cy: document.getElementById('cy'),
+        infoSidebar: document.getElementById('infoSidebar'),
+        sidebarTrigger: document.getElementById('sidebarTrigger'),
+        metaName: document.getElementById('metaName'),
+        metaSerial: document.getElementById('metaSerial'),
+        metaDate: document.getElementById('metaDate'),
+        techPackList: document.getElementById('techPackList'),
+        btnLineView: document.getElementById('btnLineView'),
+        btnCarView: document.getElementById('btnCarView'),
+        loader: document.getElementById('loader')
+    };
+
+    // -------------------------------------------------------------------------
+    // 核心功能：Cytoscape 初始化与配置
+    // -------------------------------------------------------------------------
+
+    function initCy(elements, layoutName = 'dagre') {
+        if (cy) {
+            try {
+                cy.destroy(); // 销毁旧实例
+            } catch (e) {
+                console.warn("Error destroying cy instance:", e);
+            }
+            cy = null;
+        }
+
+        // 布局配置
+        let layoutConfig;
+        if (layoutName === 'grid') {
+            // 线体信息：双列 grid 布局
+            layoutConfig = {
+                name: 'grid',
+                cols: 2, // 强制两列
+                padding: 50,
+                avoidOverlap: true
+            };
+        } else {
+            // 车型信息：Dagre 层次布局
+            // 检查 dagre 是否可用，如果不可用则回退到 breadthfirst 以防崩溃
+            const isDagreAvailable = cytoscape.extensions &&
+                cytoscape.extensions.layout &&
+                cytoscape.extensions.layout.dagre;
+
+            if (!isDagreAvailable && layoutName === 'dagre') {
+                console.error("Dagre layout not found in extensions, falling back to breadthfirst");
+                layoutName = 'breadthfirst';
+            }
+
+            if (layoutName === 'dagre') {
+                layoutConfig = {
+                    name: 'dagre',
+                    rankDir: 'TB', // 从上到下
+                    nodeSep: 50,
+                    rankSep: 100,
+                    padding: 50,
+                    animate: true,
+                    animationDuration: 500
+                };
+            } else {
+                // Fallback
+                layoutConfig = {
+                    name: 'breadthfirst',
+                    directed: true,
+                    padding: 50,
+                    spacingFactor: 1.5,
+                    animate: true,
+                    animationDuration: 500
+                };
+            }
+        }
+
+        cy = cytoscape({
+            container: dom.cy,
+            elements: elements,
+
+            // 交互设置
+            minZoom: 0.2,
+            maxZoom: 3,
+            wheelSensitivity: 0.3, // 降低滚轮灵敏度，防止一下缩放没了
+
+            layout: layoutConfig,
+
+            // 样式表
+            style: [
+                // ---------------- 节点基础样式 ----------------
+                {
+                    selector: 'node',
+                    style: {
+                        'label': 'data(label)',
+                        'text-valign': 'center',
+                        'text-halign': 'center',
+                        'color': '#ffffff',
+                        'font-size': '12px',
+                        'font-weight': 'bold',
+                        'text-outline-width': 0, // 去掉文字描边，更扁平
+                        'text-wrap': 'wrap',
+                        'text-max-width': '80px',
+                        'transition-property': 'background-color, line-color, target-arrow-color, opacity',
+                        'transition-duration': '0.3s'
+                    }
+                },
+
+                // ---------------- 特定类型节点样式 (核心需求) ----------------
+                // 1. CELL / CAR_CODE: 圆形，橙色
+                {
+                    selector: 'node[type="CELL"], node[type="CAR_CODE"]',
+                    style: {
+                        'shape': 'ellipse',
+                        'background-color': '#f97316', // Orange-500
+                        'width': '80px',
+                        'height': '80px',
+                        'border-width': 4,
+                        'border-color': '#fff4e6', // Orange-100
+                        'shadow-blur': 10,
+                        'shadow-color': 'rgba(249, 115, 22, 0.4)',
+                        'shadow-opacity': 1
+                    }
+                },
+                // 2. 普通 SRC 程序: 圆角矩形，蓝色
+                {
+                    selector: 'node[type="SRC"]',
+                    style: {
+                        'shape': 'round-rectangle',
+                        'background-color': '#3b82f6', // Blue-500
+                        'width': '100px',
+                        'height': '40px',
+                        'border-radius': '6px'
+                    }
+                },
+                // 3. 线体视图的机器人节点: 大椭圆，深色
+                {
+                    selector: 'node[type="ROBOT_ROOT"]',
+                    style: {
+                        'shape': 'ellipse',
+                        'background-color': '#ea580c', // Orange-600
+                        'width': '120px',
+                        'height': '80px',
+                        'font-size': '14px',
+                        'border-width': 4,
+                        'border-color': '#fff',
+                        'shadow-blur': 15,
+                        'shadow-color': 'rgba(0,0,0,0.2)'
+                    }
+                },
+
+                // ---------------- 连线样式 ----------------
+                {
+                    selector: 'edge',
+                    style: {
+                        'width': 2,
+                        'line-color': '#94a3b8', // Slate-400
+                        'target-arrow-color': '#94a3b8',
+                        'target-arrow-shape': 'triangle',
+                        'curve-style': 'bezier', // 贝塞尔曲线，美观
+                        'arrow-scale': 1.2,
+                        'opacity': 0.8
+                    }
+                },
+
+                // ---------------- 交互状态样式 ----------------
+                // 选中/高亮
+                {
+                    selector: '.highlighted',
+                    style: {
+                        'background-color': '#2563eb', // Darker Blue
+                        'line-color': '#2563eb',
+                        'target-arrow-color': '#2563eb',
+                        'transition-duration': '0.1s'
+                    }
+                },
+                {
+                    selector: 'node[type="CELL"].highlighted',
+                    style: {
+                        'background-color': '#c2410c', // Darker Orange
+                    }
+                },
+                // 变暗 (非相关节点)
+                {
+                    selector: '.dimmed',
+                    style: {
+                        'opacity': 0.1
+                    }
+                }
+            ]
+        });
+
+        // 事件绑定：点击高亮逻辑
+        cy.on('tap', 'node', function (evt) {
+            const node = evt.target;
+
+            // 如果是在线体视图，点击进入车型视图
+            if (currentView === 'line') {
+                switchView('car'); // 实际逻辑应该根据 node.id 加载对应数据
+                return;
+            }
+
+            // 清除之前的状态
+            cy.elements().removeClass('dimmed highlighted');
+
+            // 逻辑：高亮被点击节点 + 它的直接邻居 (入度和出度)
+            const neighborhood = node.neighborhood().add(node);
+
+            cy.elements().addClass('dimmed'); // 先全部变暗
+            neighborhood.removeClass('dimmed').addClass('highlighted'); // 恢复相关节点
+        });
+
+        // 点击空白处恢复
+        cy.on('tap', function (evt) {
+            if (evt.target === cy) {
+                cy.elements().removeClass('dimmed highlighted');
+            }
+        });
+    }
+
+    // -------------------------------------------------------------------------
+    // 视图切换逻辑
+    // -------------------------------------------------------------------------
+
+    function switchView(viewName) {
+        currentView = viewName;
+
+        // UI 按钮状态切换
+        if (viewName === 'line') {
+            dom.btnLineView.classList.add('bg-blue-600', 'text-white', 'shadow-md');
+            dom.btnLineView.classList.remove('text-slate-500', 'hover:bg-slate-100');
+
+            dom.btnCarView.classList.remove('bg-blue-600', 'text-white', 'shadow-md');
+            dom.btnCarView.classList.add('text-slate-500', 'hover:bg-slate-100');
+
+            // 隐藏详情侧边栏
+            toggleSidebar(false);
+            dom.sidebarTrigger.classList.add('hidden');
+
+            renderLineGraph();
+        } else {
+            dom.btnCarView.classList.add('bg-blue-600', 'text-white', 'shadow-md');
+            dom.btnCarView.classList.remove('text-slate-500', 'hover:bg-slate-100');
+
+            dom.btnLineView.classList.remove('bg-blue-600', 'text-white', 'shadow-md');
+            dom.btnLineView.classList.add('text-slate-500', 'hover:bg-slate-100');
+
+            // 显示侧边栏触发器
+            if (!parsedData) {
+                // 无数据时不显示
+            } else {
+                toggleSidebar(true);
+                dom.sidebarTrigger.classList.remove('hidden');
+            }
+
+            renderCarGraph();
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // 渲染逻辑 (将数据转为 Graph)
+    // -------------------------------------------------------------------------
+
+    function renderLineGraph() {
+        if (!parsedData) return;
+
+        // 构建线体视图数据：目前只有一个机器人节点
+        // 按照需求：橙色椭圆，双列排列
+        const elements = [
+            {
+                data: {
+                    id: 'robot_root',
+                    label: parsedData.robotName || 'Unknown Robot',
+                    type: 'ROBOT_ROOT'
+                }
+            }
+            // 未来多文件时，这里会有更多 push
+        ];
+
+        initCy(elements, 'grid');
+    }
+
+    function renderCarGraph() {
+        if (!parsedData) return;
+
+        // 转换 RobotInfo 为 Cytoscape Elements
+        const elements = [];
+        const nodes = new Set();
+
+        // 1. 添加节点
+        parsedData.modules.forEach(mod => {
+            if (!nodes.has(mod.name)) {
+                elements.push({
+                    data: {
+                        id: mod.name,
+                        label: mod.name,
+                        type: mod.type // 'CELL', 'SRC', etc.
+                    }
+                });
+                nodes.add(mod.name);
+            }
+        });
+
+        // 2. 添加边 (调用关系)
+        parsedData.calls.forEach((call, index) => {
+            // 确保源和目标都存在
+            if (!nodes.has(call.from)) {
+                elements.push({data: {id: call.from, label: call.from, type: 'SRC'}});
+                nodes.add(call.from);
+            }
+            if (!nodes.has(call.to)) {
+                elements.push({data: {id: call.to, label: call.to, type: 'SRC'}});
+                nodes.add(call.to);
+            }
+
+            elements.push({
+                data: {
+                    id: `e${index}`,
+                    source: call.from,
+                    target: call.to
+                }
+            });
+        });
+
+        initCy(elements, 'dagre');
+        updateSidebar(parsedData);
+    }
+
+    // -------------------------------------------------------------------------
+    // UI 辅助功能
+    // -------------------------------------------------------------------------
+
+    function toggleSidebar(forceState) {
+        const isHidden = dom.infoSidebar.classList.contains('-translate-x-full');
+        const shouldShow = forceState !== undefined ? forceState : isHidden;
+
+        if (shouldShow) {
+            dom.infoSidebar.classList.remove('-translate-x-full', 'opacity-0', 'pointer-events-none');
+            dom.sidebarTrigger.classList.add('hidden');
+        } else {
+            dom.infoSidebar.classList.add('-translate-x-full', 'opacity-0', 'pointer-events-none');
+            dom.sidebarTrigger.classList.remove('hidden');
+        }
+    }
+
+    function updateSidebar(data) {
+        dom.metaName.textContent = data.robotName;
+        dom.metaSerial.textContent = data.serialNr;
+        dom.metaDate.textContent = data.archiveDate;
+
+        dom.techPackList.innerHTML = '';
+        if (data.techPacks && data.techPacks.length > 0) {
+            data.techPacks.forEach(pack => {
+                const div = document.createElement('div');
+                div.className = 'bg-slate-50 p-2 rounded border border-slate-100 text-xs flex justify-between';
+                div.innerHTML = `
+                        <span class="font-medium text-slate-700">${pack.name}</span>
+                        <span class="text-slate-400">${pack.version}</span>
+                    `;
+                dom.techPackList.appendChild(div);
+            });
+        } else {
+            dom.techPackList.innerHTML = '<div class="text-sm text-slate-400 italic">No TechPacks found</div>';
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // 模拟/上传处理
+    // -------------------------------------------------------------------------
+
+    function simulateUpload() {
+        dom.loader.classList.remove('hidden');
+        dom.loader.classList.add('flex');
+
+        setTimeout(() => {
+            // 生成模拟数据 (Mocking Backend Response)
+            parsedData = generateMockData();
+
+            dom.loader.classList.add('hidden');
+            dom.loader.classList.remove('flex');
+
+            // 默认进入车型视图
+            switchView('car');
+        }, 1000);
+    }
+
+    function generateMockData() {
+        return {
+            robotName: "KUKA_EC010_L1",
+            serialNr: "8144104",
+            archiveDate: "2025-09-23 10:09",
+            techPacks: [
+                {name: "KUKA.Profinet", version: "5.0.4"},
+                {name: "ServoGunBasic", version: "3.2.1"},
+                {name: "UserTech", version: "2.4.1"}
+            ],
+            // 模拟模块列表
+            modules: [
+                {name: "CELL", type: "CELL"},
+                {name: "A01_Main", type: "SRC"},
+                {name: "A01_Init", type: "SRC"},
+                {name: "A01_Weld_Job1", type: "SRC"},
+                {name: "A01_Weld_Job2", type: "SRC"},
+                {name: "Spot_Weld", type: "SRC"},
+                {name: "Tip_Dress", type: "SRC"},
+                {name: "Check_Gripper", type: "SRC"},
+                {name: "Global_Fault", type: "SRC"},
+                {name: "Move_Home", type: "SRC"},
+                {name: "CAR_TYPE_A", type: "CAR_CODE"}, // 示例另一个入口
+                {name: "Init_Process", type: "SRC"}
+            ],
+            // 模拟调用关系
+            calls: [
+                {from: "CELL", to: "A01_Main"},
+                {from: "CELL", to: "Move_Home"},
+                {from: "A01_Main", to: "A01_Init"},
+                {from: "A01_Main", to: "Check_Gripper"},
+                {from: "A01_Main", to: "A01_Weld_Job1"},
+                {from: "A01_Main", to: "A01_Weld_Job2"},
+                {from: "A01_Main", to: "Move_Home"},
+                {from: "A01_Weld_Job1", to: "Spot_Weld"},
+                {from: "A01_Weld_Job2", to: "Spot_Weld"},
+                {from: "Spot_Weld", to: "Tip_Dress"}, // 只有磨损时才修磨
+                {from: "Spot_Weld", to: "Global_Fault"},
+                {from: "CAR_TYPE_A", to: "Init_Process"},
+                {from: "Init_Process", to: "Check_Gripper"}
+            ]
+        };
+    }
+
+    // 监听实际上传 (这里仅做演示，不做实际 Fetch)
+    document.getElementById('fileUpload').addEventListener('change', (e) => {
+        if (e.target.files.length > 0) {
+            alert("在实际项目中，这里会调用后端 API: /api/analysis");
+            simulateUpload(); // 使用模拟数据展示效果
+        }
+    });
+
+</script>
 </body>
 </html>

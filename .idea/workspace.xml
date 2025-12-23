@@ -6,9 +6,11 @@
   <component name="ChangeListManager">
     <list default="true" id="441c94db-8d38-4ead-9894-353c9b0ad5f0" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/krl-web/src/main/resources/static/app.js" beforeDir="false" afterPath="$PROJECT_DIR$/krl-web/src/main/resources/static/app.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/krl-web/src/main/resources/static/app.js" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/krl-web/src/main/resources/static/index.html" beforeDir="false" afterPath="$PROJECT_DIR$/krl-web/src/main/resources/static/index.html" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/krl-web/src/main/resources/static/styles.css" beforeDir="false" afterPath="$PROJECT_DIR$/krl-web/src/main/resources/static/styles.css" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/krl-web/src/main/resources/static/styles.css" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/krl-web/src/main/resources/static/vendor/lucide.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/krl-web/src/main/resources/static/vendor/tailwindcss.js" beforeDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -33,6 +35,7 @@
         <option value="Enum" />
         <option value="Interface" />
         <option value="Class" />
+        <option value="JavaScript File" />
       </list>
     </option>
   </component>
@@ -108,6 +111,7 @@
       <recent name="$PROJECT_DIR$/demo" />
     </key>
     <key name="MoveFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$/krl-web/src/main/resources/static/vendor" />
       <recent name="$PROJECT_DIR$/krl-core" />
       <recent name="$PROJECT_DIR$/src/main/java/tech/waitforu/krl-core" />
     </key>
