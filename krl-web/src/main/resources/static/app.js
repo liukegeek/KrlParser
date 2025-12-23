@@ -4,10 +4,6 @@ const configInput = document.getElementById("config-file");
 const statusEl = document.getElementById("status");
 const emptyState = document.getElementById("empty-state");
 const graphSvg = document.getElementById("graph");
-const graphWrapper = document.querySelector(".graph-wrapper");
-const tabButtons = document.querySelectorAll(".tab-button");
-const tabPanels = document.querySelectorAll("[data-panel]");
-const lineGrid = document.getElementById("line-grid");
 
 const robotNameEl = document.getElementById("robot-name");
 const archiveNameEl = document.getElementById("archive-name");
@@ -23,15 +19,14 @@ const ctx = document.createElement("canvas").getContext("2d");
 ctx.font = "600 13px Inter";
 
 let graphState = null;
-let currentRobotInfo = null;
 
 const nodeStyles = {
-  CELL: { className: "node--cell", shape: "circle" },
-  CEll: { className: "node--cell", shape: "circle" },
+  CELL: { className: "node--cell", shape: "rounded" },
+  CEll: { className: "node--cell", shape: "rounded" },
+  P_PROGRAM: { className: "node--p-program", shape: "rect" },
   CAR_CODE: { className: "node--car-code", shape: "circle" },
-  P_PROGRAM: { className: "node--p-program", shape: "rounded" },
-  CAR_PROGRAM: { className: "node--car-program", shape: "rounded" },
-  ROUTE_PROCESS: { className: "node--route", shape: "rounded" },
+  CAR_PROGRAM: { className: "node--car-program", shape: "diamond" },
+  ROUTE_PROCESS: { className: "node--route", shape: "hexagon" },
   VIRTUAL: { className: "node--virtual", shape: "rounded" }
 };
 
@@ -44,6 +39,7 @@ const setStatus = (message, type = "info") => {
 
 const setRobotInfo = (info) => {
   robotNameEl.textContent = info?.robotName || "-";
+  archiveNameEl.textContent = info?.archiveName || "-";
   archiveDateEl.textContent = info?.archiveDate || "-";
   archiveVersionEl.textContent = info?.version || "-";
 
@@ -107,9 +103,6 @@ const measureLabel = (lines) => {
 };
 
 const collectGraph = (root) => {
-  if (!root) {
-    return { nodes: new Map(), edges: [] };
-  }
   const nodes = new Map();
   const edges = [];
   const edgeSet = new Set();
@@ -146,8 +139,8 @@ const buildLayout = ({ nodes, edges }) => {
   const g = new dagre.graphlib.Graph();
   g.setGraph({
     rankdir: "TB",
-    nodesep: 70,
-    ranksep: 110,
+    nodesep: 60,
+    ranksep: 90,
     marginx: 40,
     marginy: 40
   });
@@ -161,12 +154,9 @@ const buildLayout = ({ nodes, edges }) => {
     let nodeWidth = width;
     let nodeHeight = height;
     if (style.shape === "circle") {
-      const diameter = Math.max(width, height, 56);
+      const diameter = Math.max(width, height);
       nodeWidth = diameter;
       nodeHeight = diameter;
-    } else {
-      nodeWidth = Math.max(width, 110);
-      nodeHeight = Math.max(height, 48);
     }
     g.setNode(id, {
       width: nodeWidth,
@@ -208,40 +198,35 @@ const renderGraph = (graph, rawData) => {
   defs
     .append("marker")
     .attr("id", "arrow")
-    .attr("viewBox", "0 0 12 12")
-    .attr("refX", 10)
-    .attr("refY", 6)
-    .attr("markerWidth", 10)
-    .attr("markerHeight", 10)
+    .attr("viewBox", "0 0 10 10")
+    .attr("refX", 9)
+    .attr("refY", 5)
+    .attr("markerWidth", 8)
+    .attr("markerHeight", 8)
     .attr("orient", "auto-start-reverse")
     .append("path")
-    .attr("d", "M 0 0 L 12 6 L 0 12 z")
-    .attr("fill", "#1e293b");
+    .attr("d", "M 0 0 L 10 5 L 0 10 z")
+    .attr("fill", "#1f2937");
 
   const zoomLayer = svg.append("g").attr("class", "graph-layer");
-  const zoom = d3
-    .zoom()
-    .scaleExtent([0.55, 2.5])
-    .on("zoom", (event) => {
+  svg.call(
+    d3.zoom().scaleExtent([0.4, 2]).on("zoom", (event) => {
       zoomLayer.attr("transform", event.transform);
-    });
-  svg.call(zoom);
-
-  const edgeData = graph.edges().map((edge) => ({
-    from: edge.v,
-    to: edge.w,
-    points: graph.edge(edge).points || []
-  }));
+    })
+  );
 
   const links = zoomLayer
     .append("g")
     .selectAll("path")
-    .data(edgeData.filter((edge) => edge.points.length))
+    .data(rawData.edges)
     .enter()
     .append("path")
     .attr("class", "link")
     .attr("marker-end", "url(#arrow)")
-    .attr("d", (edge) => d3.line().curve(d3.curveCatmullRom.alpha(0.5))(edge.points));
+    .attr("d", (edge) => {
+      const points = graph.edge(edge.from, edge.to).points;
+      return d3.line().curve(d3.curveMonotoneY)(points);
+    });
 
   const nodes = zoomLayer
     .append("g")
@@ -273,6 +258,28 @@ const renderGraph = (graph, rawData) => {
         .append("circle")
         .attr("class", "shape")
         .attr("r", Math.max(halfWidth, halfHeight));
+    } else if (layout.shape === "diamond") {
+      group
+        .append("polygon")
+        .attr("class", "shape")
+        .attr(
+          "points",
+          `0,${-halfHeight} ${halfWidth},0 0,${halfHeight} ${-halfWidth},0`
+        );
+    } else if (layout.shape === "hexagon") {
+      const w = halfWidth;
+      const h = halfHeight;
+      const points = [
+        [-w * 0.6, 0],
+        [-w * 0.3, -h],
+        [w * 0.3, -h],
+        [w * 0.6, 0],
+        [w * 0.3, h],
+        [-w * 0.3, h]
+      ]
+        .map((point) => point.join(","))
+        .join(" ");
+      group.append("polygon").attr("class", "shape").attr("points", points);
     } else {
       group
         .append("rect")
@@ -281,8 +288,8 @@ const renderGraph = (graph, rawData) => {
         .attr("y", -halfHeight)
         .attr("width", layout.width)
         .attr("height", layout.height)
-        .attr("rx", 16)
-        .attr("ry", 16);
+        .attr("rx", layout.shape === "rounded" ? 12 : 4)
+        .attr("ry", layout.shape === "rounded" ? 12 : 4);
     }
   });
 
@@ -327,19 +334,6 @@ const renderGraph = (graph, rawData) => {
   svg.on("click", () => {
     highlightNode(null);
   });
-
-  const fitToView = () => {
-    const wrapperRect = graphWrapper.getBoundingClientRect();
-    if (!wrapperRect.width || !wrapperRect.height) {
-      return;
-    }
-    const scale = Math.max(0.65, Math.min(wrapperRect.width / width, wrapperRect.height / height, 1));
-    const translateX = (wrapperRect.width - width * scale) / 2;
-    const translateY = (wrapperRect.height - height * scale) / 2;
-    svg.call(zoom.transform, d3.zoomIdentity.translate(translateX, translateY).scale(scale));
-  };
-
-  fitToView();
 
   graphState = { highlightNode };
 };
@@ -406,49 +400,13 @@ form.addEventListener("submit", async (event) => {
     }
 
     const data = await response.json();
-    currentRobotInfo = data;
     setRobotInfo(data);
     const graphData = collectGraph(data.callGraphRoot);
     const layout = buildLayout(graphData);
     renderGraph(layout, graphData);
-    updateLineInfo([data]);
     emptyState.style.display = "none";
     setStatus("解析成功，点击节点查看关联链路", "success");
   } catch (error) {
     setStatus(error.message, "error");
   }
 });
-
-const updateLineInfo = (robots) => {
-  lineGrid.innerHTML = "";
-  const list = robots.length ? robots : [{ robotName: "未知机器人" }];
-  list.forEach((robot) => {
-    const node = document.createElement("div");
-    node.className = "line-node";
-    node.textContent = robot.robotName || "未命名机器人";
-    node.addEventListener("click", () => {
-      switchTab("car-info");
-    });
-    lineGrid.appendChild(node);
-  });
-};
-
-const switchTab = (tabId) => {
-  tabButtons.forEach((button) => {
-    button.classList.toggle("is-active", button.dataset.tab === tabId);
-  });
-  tabPanels.forEach((panel) => {
-    panel.hidden = panel.dataset.panel !== tabId;
-  });
-  if (tabId === "car-info" && graphState?.highlightNode) {
-    graphState.highlightNode(null);
-  }
-};
-
-tabButtons.forEach((button) => {
-  button.addEventListener("click", () => {
-    switchTab(button.dataset.tab);
-  });
-});
-
-updateLineInfo([]);

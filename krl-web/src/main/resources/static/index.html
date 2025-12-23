@@ -44,68 +44,61 @@
         </div>
       </header>
 
-      <main class="workspace">
-        <section class="graph-section">
-          <div class="legend">
-            <div class="legend-item"><span class="legend-shape cell"></span>Cell 程序</div>
-            <div class="legend-item"><span class="legend-shape p-program"></span>P 程序</div>
-            <div class="legend-item"><span class="legend-shape car-code"></span>车型代码</div>
-            <div class="legend-item"><span class="legend-shape car-program"></span>车型程序</div>
-            <div class="legend-item"><span class="legend-shape route"></span>轨迹程序</div>
-            <div class="legend-item"><span class="legend-shape virtual"></span>虚拟节点</div>
+      <section class="info-panel">
+        <div class="info-card">
+          <h3>机器人信息</h3>
+          <dl>
+            <div>
+              <dt>机器人名称</dt>
+              <dd id="robot-name">-</dd>
+            </div>
+            <div>
+              <dt>备份名称</dt>
+              <dd id="archive-name">-</dd>
+            </div>
+            <div>
+              <dt>备份日期</dt>
+              <dd id="archive-date">-</dd>
+            </div>
+            <div>
+              <dt>版本号</dt>
+              <dd id="archive-version">-</dd>
+            </div>
+          </dl>
+        </div>
+        <div class="info-card">
+          <h3>已安装 Tech Pack</h3>
+          <ul id="tech-pack-list" class="tag-list">
+            <li class="tag">-</li>
+          </ul>
+        </div>
+        <div class="info-card">
+          <h3>选中节点</h3>
+          <div class="selected-info">
+            <p id="selected-label">点击节点查看详细信息</p>
+            <p id="selected-type" class="muted"></p>
+            <p id="selected-id" class="muted"></p>
           </div>
-          <div class="graph-wrapper">
-            <div class="empty-state" id="empty-state">
-              <h2>尚未生成调用图</h2>
-              <p>上传备份与配置文件后，调用关系图将呈现在此处。</p>
-            </div>
-            <div class="graph-canvas" data-panel="car-info">
-              <svg id="graph" aria-label="调用关系图"></svg>
-            </div>
-            <div class="line-panel" data-panel="line-info" hidden>
-              <div class="line-grid" id="line-grid"></div>
-            </div>
-            <div class="tab-bar">
-              <button class="tab-button is-active" data-tab="car-info">车型信息</button>
-              <button class="tab-button" data-tab="line-info">线体信息</button>
-            </div>
-          </div>
-        </section>
+        </div>
+      </section>
 
-        <aside class="side-panel">
-          <div class="info-card">
-            <h3>选中节点</h3>
-            <div class="selected-info">
-              <p id="selected-label">点击节点查看详细信息</p>
-              <p id="selected-type" class="muted"></p>
-              <p id="selected-id" class="muted"></p>
-            </div>
+      <section class="graph-section">
+        <div class="legend">
+          <div class="legend-item"><span class="legend-shape cell"></span>Cell 程序</div>
+          <div class="legend-item"><span class="legend-shape p-program"></span>P 程序</div>
+          <div class="legend-item"><span class="legend-shape car-code"></span>车型代码</div>
+          <div class="legend-item"><span class="legend-shape car-program"></span>车型程序</div>
+          <div class="legend-item"><span class="legend-shape route"></span>轨迹程序</div>
+          <div class="legend-item"><span class="legend-shape virtual"></span>虚拟节点</div>
+        </div>
+        <div class="graph-wrapper">
+          <div class="empty-state" id="empty-state">
+            <h2>尚未生成调用图</h2>
+            <p>上传备份与配置文件后，调用关系图将呈现在此处。</p>
           </div>
-          <div class="info-card compact">
-            <h3>机器人摘要</h3>
-            <dl>
-              <div>
-                <dt>机器人名称</dt>
-                <dd id="robot-name">-</dd>
-              </div>
-              <div>
-                <dt>备份日期</dt>
-                <dd id="archive-date">-</dd>
-              </div>
-              <div>
-                <dt>版本号</dt>
-                <dd id="archive-version">-</dd>
-              </div>
-            </dl>
-          </div>
-          <div class="info-card compact">
-            <h3>已安装 Tech Pack</h3>
-            <ul id="tech-pack-list" class="tag-list">
-              <li class="tag">-</li>
-            </ul>
-          </div>
-        </aside>
-      </main>
+          <svg id="graph" aria-label="调用关系图"></svg>
+        </div>
+      </section>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
