@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>KUKA 调用关系图分析</title>
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      rel="preconnect"
+      href="https://fonts.gstatic.com"
+      crossorigin
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <div class="page">
+      <!-- 顶部标题与上传区域 -->
+      <header class="hero">
+        <div>
+          <p class="eyebrow">KUKA KRL 备份解析</p>
+          <h1>调用关系图可视化</h1>
+          <p class="subtitle">
+            上传机器人备份与配置文件，自动解析程序调用链路，并以清晰的调用图呈现。
+          </p>
+        </div>
+        <div class="hero-card">
+          <!-- 上传表单：备份 zip 与配置文件 -->
+          <form id="analysis-form" class="upload-form">
+            <label class="field">
+              <span>备份压缩包 (.zip)</span>
+              <input id="zip-file" type="file" accept=".zip" required />
+            </label>
+            <label class="field">
+              <span>配置文件 (.yml / .yaml)</span>
+              <input id="config-file" type="file" accept=".yml,.yaml" required />
+            </label>
+            <button class="primary" type="submit">
+              开始解析
+            </button>
+            <p id="status" class="status">等待上传文件</p>
+          </form>
+        </div>
+      </header>
+
+      <!-- 主工作区：调用图 + 侧边信息 -->
+      <main class="workspace">
+        <!-- 调用关系图区域（主展示区） -->
+        <section class="graph-section">
+          <div class="legend">
+            <div class="legend-item"><span class="legend-shape cell"></span>Cell 程序</div>
+            <div class="legend-item"><span class="legend-shape p-program"></span>P 程序</div>
+            <div class="legend-item"><span class="legend-shape car-code"></span>车型代码</div>
+            <div class="legend-item"><span class="legend-shape car-program"></span>车型程序</div>
+            <div class="legend-item"><span class="legend-shape route"></span>轨迹程序</div>
+            <div class="legend-item"><span class="legend-shape virtual"></span>虚拟节点</div>
+          </div>
+          <div class="graph-wrapper">
+            <!-- 空状态提示 -->
+            <div class="empty-state" id="empty-state">
+              <h2>尚未生成调用图</h2>
+              <p>上传备份与配置文件后，调用关系图将呈现在此处。</p>
+            </div>
+            <!-- 车型信息：调用关系图 -->
+            <div class="graph-canvas" data-panel="car-info">
+              <svg id="graph" aria-label="调用关系图"></svg>
+            </div>
+            <!-- 线体信息：机器人列表（当前单个机器人时只有一个节点） -->
+            <div class="line-panel" data-panel="line-info" hidden>
+              <div class="line-grid" id="line-grid"></div>
+            </div>
+            <!-- 右下角标签切换 -->
+            <div class="tab-bar">
+              <button class="tab-button is-active" data-tab="car-info">车型信息</button>
+              <button class="tab-button" data-tab="line-info">线体信息</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- 右侧信息面板：不占主画面空间 -->
+        <aside class="side-panel">
+          <!-- 选中节点信息 -->
+          <div class="info-card">
+            <h3>选中节点</h3>
+            <div class="selected-info">
+              <p id="selected-label">点击节点查看详细信息</p>
+              <p id="selected-type" class="muted"></p>
+              <p id="selected-id" class="muted"></p>
+            </div>
+          </div>
+          <!-- 机器人摘要信息 -->
+          <div class="info-card compact">
+            <h3>机器人摘要</h3>
+            <dl>
+              <div>
+                <dt>机器人名称</dt>
+                <dd id="robot-name">-</dd>
+              </div>
+              <div>
+                <dt>备份日期</dt>
+                <dd id="archive-date">-</dd>
+              </div>
+              <div>
+                <dt>版本号</dt>
+                <dd id="archive-version">-</dd>
+              </div>
+            </dl>
+          </div>
+          <!-- Tech Pack 列表 -->
+          <div class="info-card compact">
+            <h3>已安装 Tech Pack</h3>
+            <ul id="tech-pack-list" class="tag-list">
+              <li class="tag">-</li>
+            </ul>
+          </div>
+        </aside>
+      </main>
+    </div>
+
+    <!-- 图渲染依赖 -->
+    <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@dagrejs/dagre@1.0.4/dist/dagre.min.js"></script>
+    <!-- 主逻辑脚本 -->
+    <script src="app.js"></script>
+  </body>
+</html>
