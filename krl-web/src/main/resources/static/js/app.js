@@ -402,14 +402,17 @@ function updateSidebar(data) {
 
 async function uploadAnalysis() {
     if (!uploadState.zipFile) {
+        alert('请先上传备份文件');
+        return;
+    }
+    if (!uploadState.configFile) {
+        alert('请先上传配置文件');
         return;
     }
 
     const formData = new FormData();
     formData.append('file', uploadState.zipFile);
-    if (uploadState.configFile) {
-        formData.append('config', uploadState.configFile);
-    }
+    formData.append('config', uploadState.configFile);
 
     dom.loader.classList.remove('hidden');
     dom.loader.classList.add('flex');
@@ -421,14 +424,16 @@ async function uploadAnalysis() {
         });
 
         if (!response.ok) {
-            throw new Error(`解析失败: ${response.status}`);
+            const errorText = await response.text();
+            const message = errorText ? `解析失败: ${errorText}` : `解析失败: ${response.status}`;
+            throw new Error(message);
         }
 
         parsedData = await response.json();
         switchView('car');
     } catch (error) {
         console.error(error);
-        alert('解析失败，请检查后端日志或接口返回。');
+        alert(error.message || '解析失败，请检查后端日志或接口返回。');
     } finally {
         dom.loader.classList.add('hidden');
         dom.loader.classList.remove('flex');
@@ -440,7 +445,7 @@ const zipInput = document.getElementById('fileUpload');
 const configInput = document.getElementById('configUpload');
 
 function updateStartButtonState() {
-    if (uploadState.zipFile) {
+    if (uploadState.zipFile && uploadState.configFile) {
         dom.startAnalysisBtn.disabled = false;
         dom.startAnalysisBtn.classList.remove('action-disabled');
     } else {
@@ -456,6 +461,19 @@ function formatFileLabel(file, defaultLabel) {
     return `${defaultLabel}: ${file.name}`;
 }
 
+function isAllowedExtension(file, allowedExtensions) {
+    const extension = file.name.split('.').pop()?.toLowerCase();
+    if (!extension) {
+        return false;
+    }
+    return allowedExtensions.includes(extension);
+}
+
+function resetInputFile(input, labelElement, defaultLabel) {
+    input.value = '';
+    labelElement.textContent = defaultLabel;
+}
+
 dom.fileUploadButton.addEventListener('click', () => {
     zipInput.click();
 });
@@ -465,18 +483,38 @@ dom.configUploadButton.addEventListener('click', () => {
 });
 
 zipInput.addEventListener('change', (e) => {
-    uploadState.zipFile = e.target.files[0] || null;
+    const file = e.target.files[0] || null;
+    if (file && !isAllowedExtension(file, ['zip'])) {
+        alert('请选择 .zip 格式的备份文件');
+        resetInputFile(zipInput, dom.fileUploadText, '上传备份 (.zip)');
+        uploadState.zipFile = null;
+        updateStartButtonState();
+        return;
+    }
+
+    uploadState.zipFile = file;
     dom.fileUploadText.textContent = formatFileLabel(uploadState.zipFile, '上传备份 (.zip)');
     updateStartButtonState();
 });
 
 configInput.addEventListener('change', (e) => {
-    uploadState.configFile = e.target.files[0] || null;
+    const file = e.target.files[0] || null;
+    if (file && !isAllowedExtension(file, ['json', 'yml', 'yaml'])) {
+        alert('配置文件仅支持 .json/.yml/.yaml');
+        resetInputFile(configInput, dom.configUploadText, '上传配置');
+        uploadState.configFile = null;
+        updateStartButtonState();
+        return;
+    }
+
+    uploadState.configFile = file;
     dom.configUploadText.textContent = formatFileLabel(uploadState.configFile, '上传配置');
+    updateStartButtonState();
 });
 
 dom.startAnalysisBtn.addEventListener('click', () => {
     if (dom.startAnalysisBtn.disabled) {
+        alert('请先上传备份和配置文件');
         return;
     }
     uploadAnalysis();
