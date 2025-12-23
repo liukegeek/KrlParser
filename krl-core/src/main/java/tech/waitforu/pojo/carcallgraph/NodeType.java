@@ -10,8 +10,8 @@ package tech.waitforu.pojo.carcallgraph;
 */
 public enum NodeType {
     CEll, //cell程序
-    CAR_CODE,//车型代码结点
     P_PROGRAM, //P程序
+    CAR_CODE,//车型代码结点
     CAR_PROGRAM,//车型程序
     ROUTE_PROCESS, //轨迹程序
     VIRTUAL //虚拟节点，代表逻辑上的关系，但实际却并不存在。

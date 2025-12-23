@@ -41,10 +41,9 @@ public class KrlZipLoader {
     public KrlZipLoader(String filePath, IgnoreRuleByStr fileIgnoreRuleByStr) {
         this.fileIgnoreRuleByStr = fileIgnoreRuleByStr;
 
-        String userHome = System.getProperty("user.home");
 
         // 压缩包路径
-        Path zipPath = Paths.get(userHome, filePath);
+        Path zipPath = Paths.get(filePath);
 
         //打开zipPath这一.zip文件，并将其内部视为一个可以独立操作的根目录和文件结构，
         //从而可以通过 Java 代码像访问本地文件夹一样访问 .zip 里的内容。
