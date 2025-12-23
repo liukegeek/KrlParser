@@ -35,7 +35,12 @@ const dom = {
     techPackList: document.getElementById('techPackList'),
     btnLineView: document.getElementById('btnLineView'),
     btnCarView: document.getElementById('btnCarView'),
-    loader: document.getElementById('loader')
+    loader: document.getElementById('loader'),
+    fileUploadButton: document.getElementById('fileUploadButton'),
+    configUploadButton: document.getElementById('configUploadButton'),
+    fileUploadText: document.getElementById('fileUploadText'),
+    configUploadText: document.getElementById('configUploadText'),
+    startAnalysisBtn: document.getElementById('startAnalysisBtn')
 };
 
 // -------------------------------------------------------------------------
@@ -434,11 +439,45 @@ async function uploadAnalysis() {
 const zipInput = document.getElementById('fileUpload');
 const configInput = document.getElementById('configUpload');
 
+function updateStartButtonState() {
+    if (uploadState.zipFile) {
+        dom.startAnalysisBtn.disabled = false;
+        dom.startAnalysisBtn.classList.remove('action-disabled');
+    } else {
+        dom.startAnalysisBtn.disabled = true;
+        dom.startAnalysisBtn.classList.add('action-disabled');
+    }
+}
+
+function formatFileLabel(file, defaultLabel) {
+    if (!file) {
+        return defaultLabel;
+    }
+    return `${defaultLabel}: ${file.name}`;
+}
+
+dom.fileUploadButton.addEventListener('click', () => {
+    zipInput.click();
+});
+
+dom.configUploadButton.addEventListener('click', () => {
+    configInput.click();
+});
+
 zipInput.addEventListener('change', (e) => {
     uploadState.zipFile = e.target.files[0] || null;
-    uploadAnalysis();
+    dom.fileUploadText.textContent = formatFileLabel(uploadState.zipFile, '上传备份 (.zip)');
+    updateStartButtonState();
 });
 
 configInput.addEventListener('change', (e) => {
     uploadState.configFile = e.target.files[0] || null;
+    dom.configUploadText.textContent = formatFileLabel(uploadState.configFile, '上传配置');
+});
+
+dom.startAnalysisBtn.addEventListener('click', () => {
+    if (dom.startAnalysisBtn.disabled) {
+        return;
+    }
+    uploadAnalysis();
 });

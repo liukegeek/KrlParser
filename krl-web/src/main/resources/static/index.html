@@ -39,21 +39,30 @@
     <div class="flex items-center gap-4">
         <!-- 上传备份按钮区域 -->
         <div class="file-input-wrapper">
-            <button class="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md shadow transition-colors text-sm font-medium">
+            <button id="fileUploadButton" type="button"
+                    class="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md shadow transition-colors text-sm font-medium">
                 <i data-lucide="upload-cloud" class="w-4 h-4"></i>
-                上传备份 (.zip)
+                <span id="fileUploadText">上传备份 (.zip)</span>
             </button>
             <input type="file" id="fileUpload" accept=".zip"/>
         </div>
 
         <!-- 上传配置按钮区域 -->
         <div class="file-input-wrapper">
-            <button class="flex items-center gap-2 px-4 py-2 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-md shadow-sm transition-colors text-sm font-medium">
+            <button id="configUploadButton" type="button"
+                    class="flex items-center gap-2 px-4 py-2 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-md shadow-sm transition-colors text-sm font-medium">
                 <i data-lucide="file-cog" class="w-4 h-4"></i>
-                上传配置
+                <span id="configUploadText">上传配置</span>
             </button>
             <input type="file" id="configUpload" accept=".json,.yaml,.yml,.properties"/>
         </div>
+
+        <button id="startAnalysisBtn" type="button"
+                class="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md shadow transition-colors text-sm font-medium action-disabled"
+                disabled>
+            <i data-lucide="play" class="w-4 h-4"></i>
+            开始分析
+        </button>
     </div>
 </header>
 
