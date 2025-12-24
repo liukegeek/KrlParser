@@ -65,3 +65,68 @@
 #startAnalysisBtn:not(.action-disabled) {
     cursor: pointer;
 }
+
+.node-size-slider {
+    flex: 1;
+    height: 4px;
+    cursor: pointer;
+    accent-color: #3b82f6;
+}
+
+.node-type-button {
+    min-width: 56px;
+}
+
+#nodeOverlay {
+    position: absolute;
+    inset: 0;
+}
+
+.node-marker {
+    position: absolute;
+    width: 18px;
+    height: 18px;
+    border-radius: 9999px;
+    background: rgba(255, 255, 255, 0.9);
+    border: 1px solid #cbd5f5;
+    color: #2563eb;
+    font-size: 11px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 6px rgba(15, 23, 42, 0.15);
+    pointer-events: auto;
+    cursor: pointer;
+}
+
+.node-marker-right {
+    color: #0f766e;
+    border-color: #99f6e4;
+}
+
+.node-popover {
+    position: absolute;
+    max-width: 260px;
+    background: rgba(255, 255, 255, 0.95);
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 10px 12px;
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.18);
+    font-size: 12px;
+    color: #334155;
+    z-index: 25;
+    pointer-events: auto;
+}
+
+.node-popover-title {
+    font-weight: 700;
+    color: #0f172a;
+    margin-bottom: 6px;
+}
+
+.node-popover-content {
+    white-space: pre-wrap;
+    word-break: break-all;
+    line-height: 1.4;
+}
