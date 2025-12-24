@@ -65,3 +65,55 @@
 #startAnalysisBtn:not(.action-disabled) {
     cursor: pointer;
 }
+
+.node-size-slider {
+    flex: 1;
+    height: 4px;
+    cursor: pointer;
+    accent-color: #3b82f6;
+}
+
+.node-type-button {
+    min-width: 56px;
+}
+
+.node-type-button.active {
+    color: #2563eb;
+    font-weight: 700;
+    text-shadow: 0 0 6px rgba(37, 99, 235, 0.35);
+}
+
+.node-popover {
+    position: absolute;
+    max-width: 320px;
+    background: rgba(255, 255, 255, 0.95);
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 10px 12px;
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.18);
+    font-size: 12px;
+    color: #334155;
+    z-index: 25;
+    pointer-events: auto;
+}
+
+.node-popover-title {
+    font-weight: 700;
+    color: #0f172a;
+    margin-bottom: 6px;
+    cursor: move;
+}
+
+.node-popover-content {
+    white-space: pre-wrap;
+    word-break: break-all;
+    line-height: 1.4;
+}
+
+.node-popover-resizable {
+    resize: both;
+    overflow: auto;
+    min-width: 200px;
+    min-height: 120px;
+    max-height: 60vh;
+}
