@@ -241,11 +241,11 @@ function initCy(elements, layoutName = 'dagre') {
         // 清除之前的状态
         cy.elements().removeClass('dimmed highlighted');
 
-        // 逻辑：高亮被点击节点 + 它的直接邻居 (入度和出度)
-        const neighborhood = node.neighborhood().add(node);
+        // 逻辑：高亮被点击节点 + 所有祖先与子孙节点（完整链路）
+        const lineage = node.predecessors().add(node).add(node.successors());
 
         cy.elements().addClass('dimmed');
-        neighborhood.removeClass('dimmed').addClass('highlighted');
+        lineage.removeClass('dimmed').addClass('highlighted');
     });
 
     // 点击空白处恢复
@@ -359,6 +359,120 @@ function renderCarGraph() {
 }
 
 // -------------------------------------------------------------------------
+// 数据规范化 (后端 JSON -> 前端结构)
+// -------------------------------------------------------------------------
+
+function mapNodeType(rawType) {
+    const normalized = String(rawType || '').toUpperCase();
+    switch (normalized) {
+        case 'CELL':
+        case 'CELL_PROGRAM':
+        case 'CELL_PROGRAMS':
+            return 'CELL';
+        case 'CAR_CODE':
+            return 'CAR_CODE';
+        case 'DAT':
+        case 'SYSTEM':
+        case 'VIRTUAL':
+            return 'SYSTEM';
+        case 'CAR_PROGRAM':
+        case 'P_PROGRAM':
+        case 'ROUTE_PROCESS':
+        case 'SRC':
+            return 'SRC';
+        default:
+            return 'SRC';
+    }
+}
+
+function normalizeTechPacks(rawList) {
+    if (!Array.isArray(rawList)) {
+        return [];
+    }
+    if (rawList.length === 0) {
+        return [];
+    }
+    if (typeof rawList[0] === 'object' && rawList[0] !== null) {
+        return rawList.map((pack) => ({
+            name: pack.name || '--',
+            version: pack.version || ''
+        }));
+    }
+    return rawList.map((pack) => ({
+        name: String(pack),
+        version: ''
+    }));
+}
+
+function buildGraphFromCallNode(rootNode) {
+    if (!rootNode) {
+        return {modules: [], calls: []};
+    }
+
+    const modules = [];
+    const calls = [];
+    const visited = new Set();
+    const stack = [rootNode];
+
+    while (stack.length > 0) {
+        const node = stack.pop();
+        if (!node || !node.id) {
+            continue;
+        }
+
+        if (!visited.has(node.id)) {
+            modules.push({
+                name: node.id,
+                value: node.value || node.id,
+                type: mapNodeType(node.nodeType)
+            });
+            visited.add(node.id);
+        }
+
+        const children = Array.isArray(node.children) ? node.children : [];
+        children.forEach((child) => {
+            if (!child || !child.id) {
+                return;
+            }
+
+            calls.push({
+                from: node.id,
+                to: child.id
+            });
+
+            if (!visited.has(child.id)) {
+                stack.push(child);
+            }
+        });
+    }
+
+    return {modules, calls};
+}
+
+function normalizeRobotInfo(raw) {
+    if (!raw || typeof raw !== 'object') {
+        return null;
+    }
+
+    if (Array.isArray(raw.modules) && Array.isArray(raw.calls)) {
+        return {
+            ...raw,
+            techPacks: normalizeTechPacks(raw.techPacks || raw.techPackList)
+        };
+    }
+
+    const graph = buildGraphFromCallNode(raw.callGraphRoot);
+    return {
+        robotName: raw.robotName,
+        version: raw.version,
+        archiveDate: raw.archiveDate,
+        techPacks: normalizeTechPacks(raw.techPackList),
+        modules: graph.modules,
+        calls: graph.calls
+    };
+}
+
+// -------------------------------------------------------------------------
 // UI 辅助功能
 // -------------------------------------------------------------------------
 
@@ -429,7 +543,11 @@ async function uploadAnalysis() {
             throw new Error(message);
         }
 
-        parsedData = await response.json();
+        const rawData = await response.json();
+        parsedData = normalizeRobotInfo(rawData);
+        if (!parsedData) {
+            throw new Error('解析失败: 返回数据格式不正确');
+        }
         switchView('car');
     } catch (error) {
         console.error(error);
