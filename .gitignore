@@ -229,6 +229,7 @@ buildNumber.properties
 .history
 .ionide
 # End of https://www.toptal.com/developers/gitignore/api/java,macos,intellij,git,maven,visualstudiocode,homebrew
+
 ### Antlr4 ###
 *.tokens
 *.interp
