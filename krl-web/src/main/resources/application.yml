@@ -1,0 +1,13 @@
+server:
+  port: 8910
+
+spring:
+  mvc:
+    # 如果你把前端静态文件放在 resources/static 下，这个保持默认即可
+    static-path-pattern: "/**"
+  application:
+    name: krl-web  # 对应spring.application.name
+  servlet:
+    multipart:
+      max-file-size: 100MB    # 单个文件最大大小
+      max-request-size: 1000MB # 单次请求最大大小（包含所有文件）

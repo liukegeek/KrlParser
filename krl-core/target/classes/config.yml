@@ -1,0 +1,35 @@
+#描述文件加载时，加载哪些文件信息
+fileLoadSection:
+  # 以!开头的路径代表忽略，其他路径代表选择.注意，prefix和suffix必须有值，否则会报空指针异常。
+  prefix:
+    - "/am.ini"
+    - "/KRC/R1"
+    - "!/Log Files"
+    - "!/Registry"
+    - "!/C"
+  suffix:
+    - "@SKIP@"  # 值为@SKIP@表示当前项不影响匹配
+
+#进行语法解析时，对那些文件进行解析
+invokerParseSection:
+  # 以!开头的名字代表忽略，其他名字代表选择。注意，prefix和suffix必须有值，否则会报空指针异常
+  # 程序中已设计为大小写不敏感，因此这里也不区分大小写
+  prefix:
+    - "!P00"  # 不解析默认自带的P00模块
+    - "!ServiceMain"
+    - "!waitSeg"
+    - "!EndSeg"
+    - "!toolChange"
+    - "!checkTOOL"
+    - "!SGL_Changing"
+    - "!taskComp"
+    - "!BAS"
+    - "!SET_CD_PARAMS"
+    - "!RESET_IO"
+    - "SET_CD_PARAMS"
+    - "" #当前面所有规则都无法解析时，跳转到这里。这里以空字符开始，即所有字符串都必定符合规则。因而这里表明，默认为不忽略，且该语句必须放在最后。
+  suffix:
+    - "@SKIP@"  # 值为@SKIP@表示当前项不影响匹配
+
+robotInfo:
+  filePath: "/am.ini"

@@ -6,6 +6,8 @@ import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.Reader;
 
 /**
  * ClassName: loader.tech.waitforu.YamlConfigLoad
@@ -26,8 +28,9 @@ public class YamlConfigLoad {
 
     public Config loadConfig(Config defaultConfig) throws IOException {
         if (!configFile.exists()) {
-            // 找不到外部配置，返回默认配置
-            return defaultConfig;
+            // 找不到外部配置，使用resources中的默认配置"config.yml",
+            InputStream configStream = getClass().getClassLoader().getResourceAsStream("config.yml");
+            return yamlMapper.readValue(configStream,Config.class);
         }
         return yamlMapper.readValue(configFile, Config.class);
     }

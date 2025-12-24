@@ -64,7 +64,10 @@ public class CarCallReferenceAnalyze {
         NodeType nodeType = NodeType.CEll;
         String id = nodeType + ":" + nodeValue;
         String relevantInfo = krlRoot.getTextContent();
-        CallNode callNode = new CallNode(id, nodeValue, nodeType, relevantInfo);
+        CallNode cellNode = new CallNode(id, nodeValue, nodeType, relevantInfo);
+        //设置结点的补充信息,关于模块文件的。
+        this.setPropertyAboutFile(cellNode,cellModule);
+
 
         Statement statement = krlRoot.getBody().getMainProgramUnit().getStatementFirst(StatementType.LOOP);
         if (!(statement instanceof LoopStatement loopStatement)) {
@@ -110,7 +113,7 @@ public class CarCallReferenceAnalyze {
                                                     KrlModule module = moduleRepository.findByCallableName(targetName);
                                                     CallNode pProgramNode = parsePProgram(module, targetName, majorIndexOfCar);
                                                     pProgramNode.setRelevantInfo(caseBlock.getTextContent());
-                                                    callNode.addChild(pProgramNode);
+                                                    cellNode.addChild(pProgramNode);
                                                 }
                                         );
                                     }
@@ -121,7 +124,7 @@ public class CarCallReferenceAnalyze {
         );
 
 
-        return callNode;
+        return cellNode;
     }
 
     public CallNode parsePProgram(KrlModule pProgramModule, String callableName, int majorIndexOfCar) {
@@ -136,6 +139,8 @@ public class CarCallReferenceAnalyze {
         NodeType nodeType = NodeType.P_PROGRAM;
         String id = nodeType + ":" + nodeValue;
         CallNode pProgramNode = new CallNode(id, nodeValue, nodeType, null);
+        //设置结点的补充信息,关于模块文件的。
+        this.setPropertyAboutFile(pProgramNode, pProgramModule);
 
 
         // 从KRL根节点中获取所有程序单元列表，筛选出名称与调用目标名称匹配的程序单元。
@@ -162,8 +167,8 @@ public class CarCallReferenceAnalyze {
                 String carProgramName = callableName;
                 //解析出车型程序的结点。
                 CallNode carProgramNode = parseCarProgram(carProgramModule, carProgramName);
-                 //将车型程序的相关信息设置为车型程序的名称。
-                 carProgramNode.setRelevantInfo("无P程序，车型调用位于cell中");
+                //将车型程序的相关信息设置为车型程序的名称。
+                carProgramNode.setRelevantInfo("无P程序，车型调用位于cell中");
 
                 //将车型程序连接在车型码下面。将车型码连接在P程序的下面。
                 carCodeNode.addChild(carProgramNode);
@@ -246,6 +251,8 @@ public class CarCallReferenceAnalyze {
         String value = null;
         NodeType nodeType = NodeType.CAR_CODE;
         CarCode carCode = new CarCode(id, nodeType, majorIndexOfCar, minorIndexOfCar);
+        //设置补充信息,车型代码是虚构结点，自然没有对应模块。模块直接传入null，方法会判断并正确处理。
+        this.setPropertyAboutFile(carCode, null);
         value = carCode.getValue();
         id = value + ":" + minorIndexOfCar;
         carCode.setId(id);
@@ -266,7 +273,8 @@ public class CarCallReferenceAnalyze {
         NodeType nodeType = NodeType.CAR_PROGRAM;
         String id = nodeType + ":" + nodeValue;
         CallNode carProgramNode = new CallNode(id, nodeValue, nodeType, null);
-
+        //设置结点的补充信息,关于模块文件的。
+        this.setPropertyAboutFile(carProgramNode,carProgramModule);
 
         // 从KRL根节点中获取所有程序单元列表，筛选出名称与调用目标名称匹配的程序单元。
         // 每个模块只有一个与调用目标名称匹配的程序单元,因此可以直接获取第一个匹配项。
@@ -288,7 +296,8 @@ public class CarCallReferenceAnalyze {
                         NodeType routNodeType = NodeType.ROUTE_PROCESS;
                         String routeNodeId = routNodeType + ":" + routeNodeValue;
                         CallNode routeProcessNode = new CallNode(routeNodeId, routeNodeValue, routNodeType, null);
-
+                        //设置结点的补充信息,关于模块文件的。
+                        this.setPropertyAboutFile(routeProcessNode,moduleRepository.findByCallableName(targetName));
                         String routeNodeRelevantInfo = invocation.findRootNode().getTextContent();
                         routeProcessNode.setRelevantInfo(routeNodeRelevantInfo);
                         carProgramNode.addChild(routeProcessNode);
@@ -303,24 +312,39 @@ public class CarCallReferenceAnalyze {
 
     /**
      * 分析备份中的车型调用关系，并返回分析结果。
+     *
      * @return 分析结果，包含车型调用关系的 carcallgraph.pojo.tech.waitforu.CallNode 树。
      */
     public CallNode analyze() {
         return analyzeCell();
     }
 
+    private void setPropertyAboutFile(CallNode callNode, KrlModule krlModule) {
+        if (callNode instanceof CarCode carCode) {
+            //设置补充信息。
+            carCode.addProperty("srcFilePath", "虚构结点，不存在物理目录路径"); //文件路径
+            carCode.addProperty("createTime", "虚构结点，不存在文件创建时间"); //创建时间
+            carCode.addProperty("modifyTime", "虚构结点，不存在文件修改时间"); //修改时间
+        } else {
+            //设置补充信息。
+            callNode.addProperty("srcFilePath", krlModule.getModuleSrcFile().getPath()); //文件路径
+            callNode.addProperty("createTime", krlModule.getModuleSrcFile().getCreateTime()); //创建时间
+            callNode.addProperty("modifyTime", krlModule.getModuleSrcFile().getModifyTime()); //修改时间
+        }
+    }
+
 
     public static void main(String[] args) {
-        YamlConfigLoad yamlConfigLoad = new YamlConfigLoad("/Users/liuke/IdeaProjects/KRLParser/src/main/resources/config.yml");
+        YamlConfigLoad yamlConfigLoad = new YamlConfigLoad("/Users/liuke/IdeaProjects/KRLParser/krl-core/src/main/resources/config.yml");
         Config config = null;
         try {
-             config = yamlConfigLoad.loadConfig(new Config());
+            config = yamlConfigLoad.loadConfig(new Config());
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
         IgnoreRuleByStr fileLoadRule = new IgnoreRuleByStr(config.getFileLoadSection());
         IgnoreRuleByStr invokerParseRule = new IgnoreRuleByStr(config.getInvokerParseSection());
-        String zipFilePath = "/Desktop/EC010_L1.zip";
+        String zipFilePath = "/Users/liuke//Desktop/EC010_L1.zip";
         KrlZipLoader krlZipLoader = new KrlZipLoader(zipFilePath, fileLoadRule);
         List<KrlFile> krlFileList = krlZipLoader.getKrlFileList();
         ModuleRepository moduleRepository = new ModuleRepository();

@@ -5,8 +5,12 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="441c94db-8d38-4ead-9894-353c9b0ad5f0" name="Changes" comment="">
+      <change afterPath="$PROJECT_DIR$/krl-web/src/main/resources/application.yml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/krl-core/src/main/java/tech/waitforu/service/CarCallAnalysisResult.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/krl-core/src/main/java/tech/waitforu/loader/YamlConfigLoad.java" beforeDir="false" afterPath="$PROJECT_DIR$/krl-core/src/main/java/tech/waitforu/loader/YamlConfigLoad.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/krl-core/src/main/java/tech/waitforu/parser/CarCallReferenceAnalyze.java" beforeDir="false" afterPath="$PROJECT_DIR$/krl-core/src/main/java/tech/waitforu/parser/CarCallReferenceAnalyze.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/krl-web/src/main/java/tech/waitforu/krlweb/KrlWebApplication.java" beforeDir="false" afterPath="$PROJECT_DIR$/krl-web/src/main/java/tech/waitforu/krlweb/KrlWebApplication.java" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -65,6 +69,7 @@
   <component name="PropertiesComponent"><![CDATA[{
   "keyToString": {
     "Application.CarCallAnalysisService.executor": "Run",
+    "Application.CarCallReferenceAnalyze (1).executor": "Debug",
     "Application.CarCallReferenceAnalyze.executor": "Debug",
     "Application.CarCode.executor": "Run",
     "Application.Decompress.executor": "Run",
@@ -83,11 +88,11 @@
     "RequestMappingsPanelWidth1": "75",
     "RunOnceActivity.ShowReadmeOnStart": "true",
     "RunOnceActivity.git.unshallow": "true",
-    "Spring Boot.KrlWebApplication.executor": "Run",
+    "Spring Boot.KrlWebApplication.executor": "Debug",
     "ToolWindow.ANTLR Preview.ShowToolbar": "false",
     "extract.method.default.visibility": "private",
     "git-widget-placeholder": "main",
-    "last_opened_file_path": "/Users/liuke/IdeaProjects/KRLParser",
+    "last_opened_file_path": "/Users/liuke/IdeaProjects/KRLParser/krl-web/src/main/resources",
     "node.js.detected.package.eslint": "true",
     "node.js.detected.package.tslint": "true",
     "node.js.selected.package.eslint": "(autodetect)",
@@ -103,6 +108,7 @@
 }]]></component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$/krl-web/src/main/resources" />
       <recent name="$PROJECT_DIR$/src/main/java/tech/waitforu" />
       <recent name="$PROJECT_DIR$/demo" />
     </key>
@@ -119,6 +125,19 @@
       <extension name="coverage">
         <pattern>
           <option name="PATTERN" value="tech.waitforu.service.*" />
+          <option name="ENABLED" value="true" />
+        </pattern>
+      </extension>
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="CarCallReferenceAnalyze (1)" type="Application" factoryName="Application" temporary="true" nameIsGenerated="true">
+      <option name="MAIN_CLASS_NAME" value="tech.waitforu.parser.CarCallReferenceAnalyze" />
+      <module name="krl-core" />
+      <extension name="coverage">
+        <pattern>
+          <option name="PATTERN" value="tech.waitforu.parser.*" />
           <option name="ENABLED" value="true" />
         </pattern>
       </extension>
@@ -165,19 +184,6 @@
         <option name="Make" enabled="true" />
       </method>
     </configuration>
-    <configuration name="YamlConfigLoad" type="Application" factoryName="Application" temporary="true" nameIsGenerated="true">
-      <option name="MAIN_CLASS_NAME" value="tech.waitforu.loader.YamlConfigLoad" />
-      <module name="KRLParser" />
-      <extension name="coverage">
-        <pattern>
-          <option name="PATTERN" value="tech.waitforu.pojo.config.*" />
-          <option name="ENABLED" value="true" />
-        </pattern>
-      </extension>
-      <method v="2">
-        <option name="Make" enabled="true" />
-      </method>
-    </configuration>
     <configuration default="true" type="JetRunConfigurationType">
       <module name="demo" />
       <method v="2">
@@ -206,11 +212,11 @@
     </configuration>
     <recent_temporary>
       <list>
+        <item itemvalue="Application.CarCallReferenceAnalyze (1)" />
         <item itemvalue="Application.CarCallAnalysisService" />
         <item itemvalue="Application.Main" />
         <item itemvalue="Application.CarCallReferenceAnalyze" />
         <item itemvalue="Application.CarCode" />
-        <item itemvalue="Application.YamlConfigLoad" />
       </list>
     </recent_temporary>
   </component>
@@ -290,14 +296,19 @@
     <breakpoint-manager>
       <breakpoints>
         <line-breakpoint enabled="true" type="java-line">
-          <url>file://$PROJECT_DIR$/krl-web/src/main/java/tech/waitforu/krlweb/controller/AnalysisController.java</url>
-          <line>36</line>
-          <option name="timeStamp" value="11" />
-        </line-breakpoint>
-        <line-breakpoint enabled="true" type="java-line">
           <url>file://$PROJECT_DIR$/krl-core/src/main/java/tech/waitforu/service/CarCallAnalysisService.java</url>
           <line>32</line>
           <option name="timeStamp" value="12" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="java-line">
+          <url>file://$PROJECT_DIR$/krl-core/src/main/java/tech/waitforu/parser/CarCallReferenceAnalyze.java</url>
+          <line>356</line>
+          <option name="timeStamp" value="16" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="java-line">
+          <url>file://$PROJECT_DIR$/krl-web/src/main/java/tech/waitforu/krlweb/KrlWebApplication.java</url>
+          <line>32</line>
+          <option name="timeStamp" value="19" />
         </line-breakpoint>
       </breakpoints>
     </breakpoint-manager>

@@ -1,0 +1,243 @@
+{
+  "robotName": "MB10",
+  "archiveDate": "2025-12-17，14:38:00",
+  "techPackList": [
+    "KUKA.BoardPackage",
+    "DiagnosisSafety"
+  ],
+
+  "level": "robot",
+  "carCallingRelation": [
+    {
+      "moduleName": "cell",
+      "level": "root",
+      "callingModule": [
+        {
+          "moduleName": "p10",
+          "level": "P",
+          "carCodes": [
+            {
+              "code": "100",
+              "level": "carCode",
+              "callingModule": [
+                {
+                  "moduleName": "SA3H100",
+                  "level": "carProgram",
+                  "callingModule": [
+                    {
+                      "moduleName": "SA3H100_weld_A",
+                      "level": "routeProcess"
+                    },
+                    {
+                      "moduleName": "SA3H100_weld_B",
+                      "level": "routeProcess"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "code": "110",
+              "level": "carCode",
+              "callingModule": [
+                {
+                  "moduleName": "SA3H110",
+                  "level": "carProgram",
+                  "callingModule": [
+                    {
+                      "moduleName": "SA3H110_weld_A",
+                      "level": "routeProcess"
+                    },
+                    {
+                      "moduleName": "SA3H110_weld_B",
+                      "level": "routeProcess"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "code": "120",
+              "level": "carCode",
+              "callingModule": [
+                {
+                  "moduleName": "SA3H120",
+                  "level": "carProgram",
+                  "callingModule": [
+                    {
+                      "moduleName": "SA3H120_weld_A",
+                      "level": "routeProcess"
+                    },
+                    {
+                      "moduleName": "SA3H120_weld_B",
+                      "level": "routeProcess"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "moduleName": "p62",
+          "level": "P",
+          "carCode": [
+            {
+              "code": "622",
+              "callingModule": [
+                {
+                  "moduleName": "SA3H622",
+                  "level": "carProgram",
+                  "callingModule": [
+                    {
+                      "moduleName": "SA3H622_weld_A",
+                      "level": "routeProcess"
+                    },
+                    {
+                      "moduleName": "SA3H622_weld_B",
+                      "level": "routeProcess"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "moduleName": "p65",
+          "level": "P",
+          "carCode": [
+            {
+              "code": "605",
+              "callingModule": [
+                {
+                  "moduleName": "SA3H605",
+                  "level": "carProgram",
+                  "callingModule": [
+                    {
+                      "moduleName": "SA3H605_weld_A",
+                      "level": "routeProcess"
+                    },
+                    {
+                      "moduleName": "SA3H605_weld_B",
+                      "level": "routeProcess"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "code": "615",
+              "callingModule": [
+                {
+                  "moduleName": "SA3H615",
+                  "level": "carProgram",
+                  "callingModule": [
+                    {
+                      "moduleName": "SA3H615_weld_A",
+                      "level": "routeProcess"
+                    },
+                    {
+                      "moduleName": "SA3H615_weld_B",
+                      "level": "routeProcess"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "code": "655",
+              "callingModule": [
+                {
+                  "moduleName": "SA3H655",
+                  "level": "carProgram",
+                  "callingModule": [
+                    {
+                      "moduleName": "SA3H655_weld_A",
+                      "level": "routeProcess"
+                    },
+                    {
+                      "moduleName": "SA3H655_weld_B",
+                      "level": "routeProcess"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "moduleName": "p72",
+          "level": "P",
+          "carCode": [
+            {
+              "code": "702",
+              "callingModule": [
+                {
+                  "moduleName": "SA3H702",
+                  "level": "carProgram",
+                  "callingModule": [
+                    {
+                      "moduleName": "SA3H702_weld_A",
+                      "level": "routeProcess"
+                    },
+                    {
+                      "moduleName": "SA3H702_weld_B",
+                      "level": "routeProcess"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "code": "722",
+              "callingModule": [
+                {
+                  "moduleName": "SA3H722",
+                  "level": "carProgram",
+                  "callingModule": [
+                    {
+                      "moduleName": "SA3H722_weld_A",
+                      "level": "routeProcess"
+                    },
+                    {
+                      "moduleName": "SA3H722_weld_B",
+                      "level": "routeProcess"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "moduleName": "P64",
+          "level":"virtual",
+          "carCodes": [
+            {
+              "code": "604",
+              "level": "carCode",
+              "callingModule": [
+                {
+                  "moduleName": "SA3H604",
+                  "level": "carProgram",
+                  "callingModule": [
+                    {
+                      "moduleName": "SA3H604_weld_A",
+                      "level": "routeProcess"
+                    },
+                    {
+                      "moduleName": "SA3H604_weld_B",
+                      "level": "routeProcess"
+                    }
+
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
