@@ -41,8 +41,10 @@ const dom = {
     fileUploadText: document.getElementById('fileUploadText'),
     configUploadText: document.getElementById('configUploadText'),
     startAnalysisBtn: document.getElementById('startAnalysisBtn'),
-    nodeOverlay: document.getElementById('nodeOverlay'),
-    nodePopover: document.getElementById('nodePopover')
+    nodePopover: document.getElementById('nodePopover'),
+    nodeControlPanel: document.getElementById('nodeControlPanel'),
+    nodeControlTrigger: document.getElementById('nodeControlTrigger'),
+    nodeControlClose: document.getElementById('nodeControlClose')
 };
 
 const nodeTypeGroups = [
@@ -63,96 +65,13 @@ const nodeTypeBaseSizes = {
 };
 
 const nodeTypeScale = new Map();
-let markerUpdateScheduled = false;
-const markerElements = new Map();
-
-function scheduleMarkerUpdate() {
-    if (!cy || markerUpdateScheduled) {
-        return;
-    }
-    markerUpdateScheduled = true;
-    requestAnimationFrame(() => {
-        markerUpdateScheduled = false;
-        updateNodeMarkers();
-    });
-}
-
-function clearNodeMarkers() {
-    markerElements.clear();
-    if (dom.nodeOverlay) {
-        dom.nodeOverlay.innerHTML = '';
-    }
-}
-
-function createNodeMarker(node, side) {
-    const marker = document.createElement('button');
-    marker.type = 'button';
-    marker.className = `node-marker node-marker-${side}`;
-    marker.dataset.nodeId = node.id();
-    marker.dataset.side = side;
-    marker.textContent = side === 'left' ? 'i' : '⇢';
-    marker.addEventListener('click', (event) => {
-        event.stopPropagation();
-        showNodePopover(node, side, marker);
-    });
-    return marker;
-}
-
-function setupNodeMarkers() {
-    if (!dom.nodeOverlay || !cy) {
-        return;
-    }
-    clearNodeMarkers();
-    cy.nodes().forEach((node) => {
-        const left = createNodeMarker(node, 'left');
-        const right = createNodeMarker(node, 'right');
-        markerElements.set(`${node.id()}-left`, left);
-        markerElements.set(`${node.id()}-right`, right);
-        dom.nodeOverlay.appendChild(left);
-        dom.nodeOverlay.appendChild(right);
-    });
-    scheduleMarkerUpdate();
-    cy.on('render zoom pan position', scheduleMarkerUpdate);
-    cy.on('layoutstop', scheduleMarkerUpdate);
-}
-
-function updateNodeMarkers() {
-    if (!cy || !dom.nodeOverlay) {
-        return;
-    }
-    const overlayRect = dom.nodeOverlay.getBoundingClientRect();
-    const containerRect = dom.cy.getBoundingClientRect();
-    const offsetX = containerRect.left - overlayRect.left;
-    const offsetY = containerRect.top - overlayRect.top;
-    cy.nodes().forEach((node) => {
-        const leftMarker = markerElements.get(`${node.id()}-left`);
-        const rightMarker = markerElements.get(`${node.id()}-right`);
-        if (!leftMarker || !rightMarker) {
-            return;
-        }
-        if (node.hidden()) {
-            leftMarker.style.display = 'none';
-            rightMarker.style.display = 'none';
-            return;
-        }
-        const box = node.renderedBoundingBox();
-        const centerY = (box.y1 + box.y2) / 2;
-        const leftX = box.x1 - 10;
-        const rightX = box.x2 + 10;
-        leftMarker.style.display = 'flex';
-        rightMarker.style.display = 'flex';
-        leftMarker.style.left = `${leftX + offsetX}px`;
-        leftMarker.style.top = `${centerY + offsetY}px`;
-        rightMarker.style.left = `${rightX + offsetX}px`;
-        rightMarker.style.top = `${centerY + offsetY}px`;
-        leftMarker.style.transform = 'translate(-50%, -50%)';
-        rightMarker.style.transform = 'translate(-50%, -50%)';
-    });
-}
+const activeTypeSelections = new Set();
+let popoverDragState = null;
 
 function hideNodePopover() {
     if (dom.nodePopover) {
         dom.nodePopover.classList.add('hidden');
+        dom.nodePopover.classList.remove('node-popover-resizable');
     }
 }
 
@@ -170,11 +89,12 @@ function createPopoverRow(label, value) {
     return wrapper;
 }
 
-function showNodePopover(node, side, anchor) {
+function showNodePopover(node, side, anchorPosition) {
     if (!dom.nodePopover) {
         return;
     }
     dom.nodePopover.innerHTML = '';
+    dom.nodePopover.classList.remove('node-popover-resizable');
     const title = document.createElement('div');
     title.className = 'node-popover-title';
     title.textContent = node.data('label') || node.id();
@@ -186,16 +106,35 @@ function showNodePopover(node, side, anchor) {
         dom.nodePopover.appendChild(createPopoverRow('创建时间', propertyMap.createTime));
         dom.nodePopover.appendChild(createPopoverRow('修改时间', propertyMap.modifyTime));
     } else {
+        dom.nodePopover.classList.add('node-popover-resizable');
         const relevantInfo = node.data('relevantInfo');
         dom.nodePopover.appendChild(createPopoverRow('相关信息', relevantInfo || '--'));
     }
-
-    const anchorRect = anchor.getBoundingClientRect();
-    const overlayRect = dom.nodeOverlay.getBoundingClientRect();
-    dom.nodePopover.style.left = `${anchorRect.left - overlayRect.left + 16}px`;
-    dom.nodePopover.style.top = `${anchorRect.top - overlayRect.top + 16}px`;
+    const containerRect = dom.cy.getBoundingClientRect();
+    dom.nodePopover.style.left = `${anchorPosition.x - containerRect.left + 16}px`;
+    dom.nodePopover.style.top = `${anchorPosition.y - containerRect.top + 16}px`;
     dom.nodePopover.classList.remove('hidden');
+
+    title.addEventListener('mousedown', (event) => {
+        event.preventDefault();
+        popoverDragState = {
+            offsetX: event.clientX - dom.nodePopover.offsetLeft,
+            offsetY: event.clientY - dom.nodePopover.offsetTop
+        };
+    });
 }
+
+document.addEventListener('mousemove', (event) => {
+    if (!popoverDragState || !dom.nodePopover) {
+        return;
+    }
+    dom.nodePopover.style.left = `${event.clientX - popoverDragState.offsetX}px`;
+    dom.nodePopover.style.top = `${event.clientY - popoverDragState.offsetY}px`;
+});
+
+document.addEventListener('mouseup', () => {
+    popoverDragState = null;
+});
 
 // -------------------------------------------------------------------------
 // 核心功能：Cytoscape 初始化与配置
@@ -209,7 +148,6 @@ function initCy(elements, layoutName = 'dagre') {
             console.warn("Error destroying cy instance:", e);
         }
         cy = null;
-        clearNodeMarkers();
         hideNodePopover();
     }
 
@@ -402,6 +340,7 @@ function initCy(elements, layoutName = 'dagre') {
 
         cy.elements().addClass('dimmed');
         lineage.removeClass('dimmed').addClass('highlighted');
+        applyTypeHighlights();
         hideNodePopover();
     });
 
@@ -409,11 +348,28 @@ function initCy(elements, layoutName = 'dagre') {
     cy.on('tap', function (evt) {
         if (evt.target === cy) {
             cy.elements().removeClass('dimmed highlighted');
+            applyTypeHighlights();
             hideNodePopover();
         }
     });
 
-    setupNodeMarkers();
+    cy.on('dblclick', 'node', function (evt) {
+        const node = evt.target;
+        const position = {
+            x: evt.originalEvent?.clientX || 0,
+            y: evt.originalEvent?.clientY || 0
+        };
+        showNodePopover(node, 'left', position);
+    });
+
+    cy.on('cxttap', 'node', function (evt) {
+        const node = evt.target;
+        const position = {
+            x: evt.originalEvent?.clientX || 0,
+            y: evt.originalEvent?.clientY || 0
+        };
+        showNodePopover(node, 'right', position);
+    });
 }
 
 // -------------------------------------------------------------------------
@@ -434,8 +390,9 @@ function switchView(viewName) {
         // 隐藏详情侧边栏
         toggleSidebar(false);
         dom.sidebarTrigger.classList.add('hidden');
-        if (dom.nodeOverlay) {
-            dom.nodeOverlay.classList.add('hidden');
+        toggleNodeControls(false);
+        if (dom.nodeControlTrigger) {
+            dom.nodeControlTrigger.classList.add('hidden');
         }
         hideNodePopover();
 
@@ -451,8 +408,9 @@ function switchView(viewName) {
             toggleSidebar(false);
             dom.sidebarTrigger.classList.remove('hidden');
         }
-        if (dom.nodeOverlay) {
-            dom.nodeOverlay.classList.remove('hidden');
+        toggleNodeControls(false);
+        if (dom.nodeControlTrigger) {
+            dom.nodeControlTrigger.classList.remove('hidden');
         }
 
         renderCarGraph();
@@ -529,6 +487,7 @@ function renderCarGraph() {
 
     initCy(elements, 'dagre');
     applyAllNodeTypeScales();
+    applyTypeHighlights();
     updateSidebar(parsedData);
 }
 
@@ -702,6 +661,22 @@ function updateSidebar(data) {
     }
 }
 
+function toggleNodeControls(forceState) {
+    if (!dom.nodeControlPanel || !dom.nodeControlTrigger) {
+        return;
+    }
+    const isHidden = dom.nodeControlPanel.classList.contains('-translate-x-full');
+    const shouldShow = forceState !== undefined ? forceState : isHidden;
+
+    if (shouldShow) {
+        dom.nodeControlPanel.classList.remove('-translate-x-full', 'opacity-0', 'pointer-events-none');
+        dom.nodeControlTrigger.classList.add('hidden');
+    } else {
+        dom.nodeControlPanel.classList.add('-translate-x-full', 'opacity-0', 'pointer-events-none');
+        dom.nodeControlTrigger.classList.remove('hidden');
+    }
+}
+
 function parseNodeTypes(raw) {
     return raw.split(',').map(type => type.trim()).filter(Boolean);
 }
@@ -746,10 +721,23 @@ function selectNodesByTypes(types) {
     }
     cy.nodes().unselect();
     cy.elements().removeClass('dimmed highlighted');
-    const selector = types.map((type) => `node[type="${type}"]`).join(', ');
-    if (selector) {
-        cy.nodes(selector).select();
+    applyTypeHighlights();
+}
+
+function applyTypeHighlights() {
+    if (!cy) {
+        return;
     }
+    if (activeTypeSelections.size === 0) {
+        return;
+    }
+    const selector = Array.from(activeTypeSelections)
+        .map((type) => `node[type="${type}"]`)
+        .join(', ');
+    if (!selector) {
+        return;
+    }
+    cy.nodes(selector).removeClass('dimmed').addClass('highlighted');
 }
 
 function initNodeControlPanel() {
@@ -759,6 +747,14 @@ function initNodeControlPanel() {
     buttons.forEach((button) => {
         button.addEventListener('click', () => {
             const types = parseNodeTypes(button.dataset.nodeTypes || '');
+            const isActive = button.classList.contains('active');
+            if (isActive) {
+                button.classList.remove('active');
+                types.forEach((type) => activeTypeSelections.delete(type));
+            } else {
+                button.classList.add('active');
+                types.forEach((type) => activeTypeSelections.add(type));
+            }
             selectNodesByTypes(types);
         });
     });
@@ -783,11 +779,21 @@ function initNodeControlPanel() {
         if (dom.nodePopover.contains(event.target)) {
             return;
         }
-        if (event.target.classList.contains('node-marker')) {
-            return;
-        }
         hideNodePopover();
     });
+
+    if (dom.cy) {
+        dom.cy.addEventListener('contextmenu', (event) => {
+            event.preventDefault();
+        });
+    }
+
+    if (dom.nodeControlTrigger) {
+        dom.nodeControlTrigger.addEventListener('click', () => toggleNodeControls());
+    }
+    if (dom.nodeControlClose) {
+        dom.nodeControlClose.addEventListener('click', () => toggleNodeControls(false));
+    }
 }
 
 initNodeControlPanel();
