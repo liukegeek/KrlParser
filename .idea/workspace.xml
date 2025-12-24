@@ -7,6 +7,11 @@
     <list default="true" id="441c94db-8d38-4ead-9894-353c9b0ad5f0" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/krl-core/target/classes/krl.g4" beforeDir="false" afterPath="$PROJECT_DIR$/krl-core/target/classes/krl.g4" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/krl-core/target/classes/return.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/krl-web/src/main/resources/application.yml" beforeDir="false" afterPath="$PROJECT_DIR$/krl-web/src/main/resources/application.yml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/krl-web/target/classes/application.properties" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/krl-web/target/classes/application.yml" beforeDir="false" afterPath="$PROJECT_DIR$/krl-web/target/classes/application.yml" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -84,7 +89,7 @@
     "RequestMappingsPanelWidth1": "75",
     "RunOnceActivity.ShowReadmeOnStart": "true",
     "RunOnceActivity.git.unshallow": "true",
-    "Spring Boot.KrlWebApplication.executor": "Debug",
+    "Spring Boot.KrlWebApplication.executor": "Run",
     "ToolWindow.ANTLR Preview.ShowToolbar": "false",
     "extract.method.default.visibility": "private",
     "git-widget-placeholder": "main",
