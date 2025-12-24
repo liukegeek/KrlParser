@@ -67,6 +67,7 @@ const nodeTypeBaseSizes = {
 const nodeTypeScale = new Map();
 const activeTypeSelections = new Set();
 let popoverDragState = null;
+let lastNodeDoubleClickAt = 0;
 
 function hideNodePopover() {
     if (dom.nodePopover) {
@@ -111,8 +112,11 @@ function showNodePopover(node, side, anchorPosition) {
         dom.nodePopover.appendChild(createPopoverRow('相关信息', relevantInfo || '--'));
     }
     const containerRect = dom.cy.getBoundingClientRect();
-    dom.nodePopover.style.left = `${anchorPosition.x - containerRect.left + 16}px`;
-    dom.nodePopover.style.top = `${anchorPosition.y - containerRect.top + 16}px`;
+    const parentRect = dom.nodePopover.offsetParent
+        ? dom.nodePopover.offsetParent.getBoundingClientRect()
+        : {left: 0, top: 0};
+    dom.nodePopover.style.left = `${containerRect.left + anchorPosition.x - parentRect.left + 16}px`;
+    dom.nodePopover.style.top = `${containerRect.top + anchorPosition.y - parentRect.top + 16}px`;
     dom.nodePopover.classList.remove('hidden');
 
     title.addEventListener('mousedown', (event) => {
@@ -324,6 +328,9 @@ function initCy(elements, layoutName = 'dagre') {
 
     // 事件绑定：点击高亮逻辑
     cy.on('tap', 'node', function (evt) {
+        if (Date.now() - lastNodeDoubleClickAt < 250) {
+            return;
+        }
         const node = evt.target;
 
         // 如果是在线体视图，点击进入车型视图
@@ -354,19 +361,22 @@ function initCy(elements, layoutName = 'dagre') {
     });
 
     cy.on('dblclick', 'node', function (evt) {
+        lastNodeDoubleClickAt = Date.now();
         const node = evt.target;
+        const renderedPosition = evt.renderedPosition || node.renderedPosition();
         const position = {
-            x: evt.originalEvent?.clientX || 0,
-            y: evt.originalEvent?.clientY || 0
+            x: renderedPosition.x,
+            y: renderedPosition.y
         };
         showNodePopover(node, 'left', position);
     });
 
     cy.on('cxttap', 'node', function (evt) {
         const node = evt.target;
+        const renderedPosition = evt.renderedPosition || node.renderedPosition();
         const position = {
-            x: evt.originalEvent?.clientX || 0,
-            y: evt.originalEvent?.clientY || 0
+            x: renderedPosition.x,
+            y: renderedPosition.y
         };
         showNodePopover(node, 'right', position);
     });
@@ -704,7 +714,6 @@ function applyNodeTypeScale(types, scale) {
             })
             .update();
     });
-    scheduleMarkerUpdate();
 }
 
 function applyAllNodeTypeScales() {
