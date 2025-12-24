@@ -31,6 +31,10 @@
     display: inline-block;
 }
 
+.file-input-wrapper button {
+    cursor: pointer;
+}
+
 .file-input-wrapper input[type=file] {
     font-size: 100px;
     position: absolute;
@@ -56,4 +60,8 @@
 .action-disabled {
     opacity: 0.6;
     cursor: not-allowed;
+}
+
+#startAnalysisBtn:not(.action-disabled) {
+    cursor: pointer;
 }
