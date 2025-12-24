@@ -537,7 +537,7 @@ Comment
 &PARAM TEMPLATE = C:\KRC\Roboter\Template\vorgabe
 &PARAM DISKPATH = KRC:\R1\BYDFunction
 */
-ast.pojo.tech.waitforu.KrlControlLine
+KrlControlLine
     : '&' (~('\n' | '\r'))*
     ;
 
