@@ -40,8 +40,162 @@ const dom = {
     configUploadButton: document.getElementById('configUploadButton'),
     fileUploadText: document.getElementById('fileUploadText'),
     configUploadText: document.getElementById('configUploadText'),
-    startAnalysisBtn: document.getElementById('startAnalysisBtn')
+    startAnalysisBtn: document.getElementById('startAnalysisBtn'),
+    nodeOverlay: document.getElementById('nodeOverlay'),
+    nodePopover: document.getElementById('nodePopover')
 };
+
+const nodeTypeGroups = [
+    {label: 'Cell', types: ['CEll']},
+    {label: 'P程序', types: ['P_PROGRAM', 'VIRTUAL']},
+    {label: '车型代码', types: ['CAR_CODE']},
+    {label: '车型程序', types: ['CAR_PROGRAM']},
+    {label: '轨迹程序', types: ['ROUTE_PROCESS']}
+];
+
+const nodeTypeBaseSizes = {
+    CEll: {width: 82, height: 82, fontSize: 12, textMaxWidth: 90},
+    CAR_CODE: {width: 82, height: 82, fontSize: 12, textMaxWidth: 90},
+    P_PROGRAM: {width: 120, height: 44, fontSize: 12, textMaxWidth: 100},
+    VIRTUAL: {width: 120, height: 44, fontSize: 12, textMaxWidth: 100},
+    CAR_PROGRAM: {width: 120, height: 44, fontSize: 12, textMaxWidth: 100},
+    ROUTE_PROCESS: {width: 120, height: 44, fontSize: 12, textMaxWidth: 100}
+};
+
+const nodeTypeScale = new Map();
+let markerUpdateScheduled = false;
+const markerElements = new Map();
+
+function scheduleMarkerUpdate() {
+    if (!cy || markerUpdateScheduled) {
+        return;
+    }
+    markerUpdateScheduled = true;
+    requestAnimationFrame(() => {
+        markerUpdateScheduled = false;
+        updateNodeMarkers();
+    });
+}
+
+function clearNodeMarkers() {
+    markerElements.clear();
+    if (dom.nodeOverlay) {
+        dom.nodeOverlay.innerHTML = '';
+    }
+}
+
+function createNodeMarker(node, side) {
+    const marker = document.createElement('button');
+    marker.type = 'button';
+    marker.className = `node-marker node-marker-${side}`;
+    marker.dataset.nodeId = node.id();
+    marker.dataset.side = side;
+    marker.textContent = side === 'left' ? 'i' : '⇢';
+    marker.addEventListener('click', (event) => {
+        event.stopPropagation();
+        showNodePopover(node, side, marker);
+    });
+    return marker;
+}
+
+function setupNodeMarkers() {
+    if (!dom.nodeOverlay || !cy) {
+        return;
+    }
+    clearNodeMarkers();
+    cy.nodes().forEach((node) => {
+        const left = createNodeMarker(node, 'left');
+        const right = createNodeMarker(node, 'right');
+        markerElements.set(`${node.id()}-left`, left);
+        markerElements.set(`${node.id()}-right`, right);
+        dom.nodeOverlay.appendChild(left);
+        dom.nodeOverlay.appendChild(right);
+    });
+    scheduleMarkerUpdate();
+    cy.on('render zoom pan position', scheduleMarkerUpdate);
+    cy.on('layoutstop', scheduleMarkerUpdate);
+}
+
+function updateNodeMarkers() {
+    if (!cy || !dom.nodeOverlay) {
+        return;
+    }
+    const overlayRect = dom.nodeOverlay.getBoundingClientRect();
+    const containerRect = dom.cy.getBoundingClientRect();
+    const offsetX = containerRect.left - overlayRect.left;
+    const offsetY = containerRect.top - overlayRect.top;
+    cy.nodes().forEach((node) => {
+        const leftMarker = markerElements.get(`${node.id()}-left`);
+        const rightMarker = markerElements.get(`${node.id()}-right`);
+        if (!leftMarker || !rightMarker) {
+            return;
+        }
+        if (node.hidden()) {
+            leftMarker.style.display = 'none';
+            rightMarker.style.display = 'none';
+            return;
+        }
+        const box = node.renderedBoundingBox();
+        const centerY = (box.y1 + box.y2) / 2;
+        const leftX = box.x1 - 10;
+        const rightX = box.x2 + 10;
+        leftMarker.style.display = 'flex';
+        rightMarker.style.display = 'flex';
+        leftMarker.style.left = `${leftX + offsetX}px`;
+        leftMarker.style.top = `${centerY + offsetY}px`;
+        rightMarker.style.left = `${rightX + offsetX}px`;
+        rightMarker.style.top = `${centerY + offsetY}px`;
+        leftMarker.style.transform = 'translate(-50%, -50%)';
+        rightMarker.style.transform = 'translate(-50%, -50%)';
+    });
+}
+
+function hideNodePopover() {
+    if (dom.nodePopover) {
+        dom.nodePopover.classList.add('hidden');
+    }
+}
+
+function createPopoverRow(label, value) {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'flex flex-col gap-1';
+    const title = document.createElement('span');
+    title.className = 'text-slate-400';
+    title.textContent = label;
+    const content = document.createElement('div');
+    content.className = 'node-popover-content';
+    content.textContent = value || '--';
+    wrapper.appendChild(title);
+    wrapper.appendChild(content);
+    return wrapper;
+}
+
+function showNodePopover(node, side, anchor) {
+    if (!dom.nodePopover) {
+        return;
+    }
+    dom.nodePopover.innerHTML = '';
+    const title = document.createElement('div');
+    title.className = 'node-popover-title';
+    title.textContent = node.data('label') || node.id();
+    dom.nodePopover.appendChild(title);
+
+    if (side === 'left') {
+        const propertyMap = node.data('propertyMap') || {};
+        dom.nodePopover.appendChild(createPopoverRow('文件路径', propertyMap.srcFilePath));
+        dom.nodePopover.appendChild(createPopoverRow('创建时间', propertyMap.createTime));
+        dom.nodePopover.appendChild(createPopoverRow('修改时间', propertyMap.modifyTime));
+    } else {
+        const relevantInfo = node.data('relevantInfo');
+        dom.nodePopover.appendChild(createPopoverRow('相关信息', relevantInfo || '--'));
+    }
+
+    const anchorRect = anchor.getBoundingClientRect();
+    const overlayRect = dom.nodeOverlay.getBoundingClientRect();
+    dom.nodePopover.style.left = `${anchorRect.left - overlayRect.left + 16}px`;
+    dom.nodePopover.style.top = `${anchorRect.top - overlayRect.top + 16}px`;
+    dom.nodePopover.classList.remove('hidden');
+}
 
 // -------------------------------------------------------------------------
 // 核心功能：Cytoscape 初始化与配置
@@ -55,6 +209,8 @@ function initCy(elements, layoutName = 'dagre') {
             console.warn("Error destroying cy instance:", e);
         }
         cy = null;
+        clearNodeMarkers();
+        hideNodePopover();
     }
 
     // 布局配置
@@ -134,9 +290,9 @@ function initCy(elements, layoutName = 'dagre') {
             },
 
             // ---------------- 特定类型节点样式 (核心需求) ----------------
-            // 1. CELL / CAR_CODE: 圆形，橙色
+            // 1. CEll / CAR_CODE: 圆形，橙色
             {
-                selector: 'node[type="CELL"], node[type="CAR_CODE"]',
+                selector: 'node[type="CEll"], node[type="CAR_CODE"]',
                 style: {
                     'shape': 'ellipse',
                     'background-color': '#f97316',
@@ -149,9 +305,9 @@ function initCy(elements, layoutName = 'dagre') {
                     'shadow-opacity': 1
                 }
             },
-            // 2. 普通 SRC 程序: 圆角矩形，蓝色
+            // 2. P 程序 / 车型程序 / 轨迹程序 / 虚拟节点: 圆角矩形，蓝色
             {
-                selector: 'node[type="SRC"]',
+                selector: 'node[type="P_PROGRAM"], node[type="VIRTUAL"], node[type="CAR_PROGRAM"], node[type="ROUTE_PROCESS"], node[type="SRC"]',
                 style: {
                     'shape': 'round-rectangle',
                     'background-color': '#3b82f6',
@@ -213,7 +369,7 @@ function initCy(elements, layoutName = 'dagre') {
                 }
             },
             {
-                selector: 'node[type="CELL"].highlighted, node[type="CAR_CODE"].highlighted',
+                selector: 'node[type="CEll"].highlighted, node[type="CAR_CODE"].highlighted',
                 style: {
                     'background-color': '#c2410c'
                 }
@@ -246,14 +402,18 @@ function initCy(elements, layoutName = 'dagre') {
 
         cy.elements().addClass('dimmed');
         lineage.removeClass('dimmed').addClass('highlighted');
+        hideNodePopover();
     });
 
     // 点击空白处恢复
     cy.on('tap', function (evt) {
         if (evt.target === cy) {
             cy.elements().removeClass('dimmed highlighted');
+            hideNodePopover();
         }
     });
+
+    setupNodeMarkers();
 }
 
 // -------------------------------------------------------------------------
@@ -274,6 +434,10 @@ function switchView(viewName) {
         // 隐藏详情侧边栏
         toggleSidebar(false);
         dom.sidebarTrigger.classList.add('hidden');
+        if (dom.nodeOverlay) {
+            dom.nodeOverlay.classList.add('hidden');
+        }
+        hideNodePopover();
 
         renderLineGraph();
     } else {
@@ -286,6 +450,9 @@ function switchView(viewName) {
         if (parsedData) {
             toggleSidebar(false);
             dom.sidebarTrigger.classList.remove('hidden');
+        }
+        if (dom.nodeOverlay) {
+            dom.nodeOverlay.classList.remove('hidden');
         }
 
         renderCarGraph();
@@ -322,15 +489,21 @@ function renderCarGraph() {
 
     // 1. 添加节点
     parsedData.modules.forEach(mod => {
-        if (!nodes.has(mod.name)) {
+        const nodeId = mod.name || mod.id;
+        if (!nodeId || nodes.has(nodeId)) {
+            return;
+        }
+        if (!nodes.has(nodeId)) {
             elements.push({
                 data: {
-                    id: mod.name,
-                    label: mod.value || mod.name,
-                    type: mod.type
+                    id: nodeId,
+                    label: mod.value || nodeId,
+                    type: mod.type,
+                    propertyMap: mod.propertyMap || {},
+                    relevantInfo: mod.relevantInfo || ''
                 }
             });
-            nodes.add(mod.name);
+            nodes.add(nodeId);
         }
     });
 
@@ -355,6 +528,7 @@ function renderCarGraph() {
     });
 
     initCy(elements, 'dagre');
+    applyAllNodeTypeScales();
     updateSidebar(parsedData);
 }
 
@@ -363,25 +537,32 @@ function renderCarGraph() {
 // -------------------------------------------------------------------------
 
 function mapNodeType(rawType) {
-    const normalized = String(rawType || '').toUpperCase();
+    const rawString = String(rawType || '');
+    if (rawString === 'CEll') {
+        return 'CEll';
+    }
+    const normalized = rawString.toUpperCase();
     switch (normalized) {
         case 'CELL':
         case 'CELL_PROGRAM':
         case 'CELL_PROGRAMS':
-            return 'CELL';
+            return 'CEll';
         case 'CAR_CODE':
             return 'CAR_CODE';
+        case 'P_PROGRAM':
+            return 'P_PROGRAM';
+        case 'VIRTUAL':
+            return 'VIRTUAL';
+        case 'CAR_PROGRAM':
+            return 'CAR_PROGRAM';
+        case 'ROUTE_PROCESS':
+            return 'ROUTE_PROCESS';
         case 'DAT':
         case 'SYSTEM':
-        case 'VIRTUAL':
-            return 'SYSTEM';
-        case 'CAR_PROGRAM':
-        case 'P_PROGRAM':
-        case 'ROUTE_PROCESS':
         case 'SRC':
             return 'SRC';
         default:
-            return 'SRC';
+            return normalized || 'SRC';
     }
 }
 
@@ -424,7 +605,9 @@ function buildGraphFromCallNode(rootNode) {
             modules.push({
                 name: node.id,
                 value: node.value || node.id,
-                type: mapNodeType(node.nodeType)
+                type: mapNodeType(node.nodeType),
+                propertyMap: node.propertyMap || {},
+                relevantInfo: node.relevantInfo || ''
             });
             visited.add(node.id);
         }
@@ -455,8 +638,17 @@ function normalizeRobotInfo(raw) {
     }
 
     if (Array.isArray(raw.modules) && Array.isArray(raw.calls)) {
+        const modules = raw.modules.map((mod) => ({
+            ...mod,
+            name: mod.name || mod.id,
+            value: mod.value || mod.name || mod.id,
+            type: mapNodeType(mod.type || mod.nodeType),
+            propertyMap: mod.propertyMap || {},
+            relevantInfo: mod.relevantInfo || ''
+        }));
         return {
             ...raw,
+            modules,
             techPacks: normalizeTechPacks(raw.techPacks || raw.techPackList)
         };
     }
@@ -509,6 +701,96 @@ function updateSidebar(data) {
         dom.techPackList.innerHTML = '<div class="text-sm text-slate-400 italic">暂无数据</div>';
     }
 }
+
+function parseNodeTypes(raw) {
+    return raw.split(',').map(type => type.trim()).filter(Boolean);
+}
+
+function getScaleKey(types) {
+    return types.slice().sort().join('|');
+}
+
+function applyNodeTypeScale(types, scale) {
+    if (!cy) {
+        return;
+    }
+    types.forEach((type) => {
+        const base = nodeTypeBaseSizes[type];
+        if (!base) {
+            return;
+        }
+        cy.style()
+            .selector(`node[type="${type}"]`)
+            .style({
+                width: `${base.width * scale}px`,
+                height: `${base.height * scale}px`,
+                'font-size': `${base.fontSize * scale}px`,
+                'text-max-width': `${base.textMaxWidth * scale}px`
+            })
+            .update();
+    });
+    scheduleMarkerUpdate();
+}
+
+function applyAllNodeTypeScales() {
+    nodeTypeGroups.forEach((group) => {
+        const key = getScaleKey(group.types);
+        const scale = nodeTypeScale.get(key) || 1;
+        applyNodeTypeScale(group.types, scale);
+    });
+}
+
+function selectNodesByTypes(types) {
+    if (!cy) {
+        return;
+    }
+    cy.nodes().unselect();
+    cy.elements().removeClass('dimmed highlighted');
+    const selector = types.map((type) => `node[type="${type}"]`).join(', ');
+    if (selector) {
+        cy.nodes(selector).select();
+    }
+}
+
+function initNodeControlPanel() {
+    const buttons = document.querySelectorAll('.node-type-button');
+    const sliders = document.querySelectorAll('.node-size-slider');
+
+    buttons.forEach((button) => {
+        button.addEventListener('click', () => {
+            const types = parseNodeTypes(button.dataset.nodeTypes || '');
+            selectNodesByTypes(types);
+        });
+    });
+
+    sliders.forEach((slider) => {
+        const types = parseNodeTypes(slider.dataset.nodeTypes || '');
+        const scaleKey = getScaleKey(types);
+        const scaleValue = Number.parseFloat(slider.value) || 1;
+        nodeTypeScale.set(scaleKey, scaleValue);
+
+        slider.addEventListener('input', () => {
+            const newScale = Number.parseFloat(slider.value) || 1;
+            nodeTypeScale.set(scaleKey, newScale);
+            applyNodeTypeScale(types, newScale);
+        });
+    });
+
+    document.addEventListener('click', (event) => {
+        if (!dom.nodePopover || dom.nodePopover.classList.contains('hidden')) {
+            return;
+        }
+        if (dom.nodePopover.contains(event.target)) {
+            return;
+        }
+        if (event.target.classList.contains('node-marker')) {
+            return;
+        }
+        hideNodePopover();
+    });
+}
+
+initNodeControlPanel();
 
 // -------------------------------------------------------------------------
 // 上传处理
