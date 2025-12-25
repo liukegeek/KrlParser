@@ -44,6 +44,8 @@
     cursor: pointer;
     width: 100%;
     height: 100%;
+    pointer-events: none;
+
 }
 
 /* 小型信息按钮 */
@@ -66,6 +68,7 @@
     cursor: pointer;
 }
 
+/* 节点大小滑块 */
 .node-size-slider {
     flex: 1;
     height: 4px;
@@ -73,16 +76,25 @@
     accent-color: #3b82f6;
 }
 
+/* 节点类型按钮 */
 .node-type-button {
     min-width: 56px;
 }
 
+/* 节点类型按钮激活状态 */
 .node-type-button.active {
-    color: #2563eb;
-    font-weight: 700;
-    text-shadow: 0 0 6px rgba(37, 99, 235, 0.35);
+    /*color: #2563eb;*/
+    color: #66ccff;
+    font-weight: 800;
+    text-shadow: 0 0 6px rgba(102, 204, 255, 0.35);
+    background-color: #eff6ff; /* blue-50 */
+    transition:
+            color 0.15s ease,
+            background-color 0.15s ease;
+
 }
 
+/* 节点类型按钮弹出层 */
 .node-popover {
     position: absolute;
     max-width: 320px;

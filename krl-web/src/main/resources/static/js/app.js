@@ -68,6 +68,7 @@ const nodeTypeScale = new Map();
 const activeTypeSelections = new Set();
 let popoverDragState = null;
 let lastNodeDoubleClickAt = 0;
+let tapTimer = null;
 
 function hideNodePopover() {
     if (dom.nodePopover) {
@@ -255,7 +256,7 @@ function initCy(elements, layoutName = 'dagre') {
                     'background-color': '#3b82f6',
                     'width': '120px',
                     'height': '44px',
-                    'border-radius': '10px'
+                    'corner-radius': '10px'
                 }
             },
             // 3. DAT / 系统文件: 灰蓝色
@@ -266,7 +267,7 @@ function initCy(elements, layoutName = 'dagre') {
                     'background-color': '#64748b',
                     'width': '120px',
                     'height': '40px',
-                    'border-radius': '10px'
+                    'corner-radius': '10px'
                 }
             },
             // 4. 线体视图的机器人节点: 大椭圆，深色
@@ -304,9 +305,10 @@ function initCy(elements, layoutName = 'dagre') {
             {
                 selector: '.highlighted',
                 style: {
-                    'background-color': '#2563eb',
-                    'line-color': '#2563eb',
-                    'target-arrow-color': '#2563eb',
+                    'background-color': '#286395',
+                    'line-color': '#286395',
+                    'color': '#ffffff',
+                    'target-arrow-color': '#286395',
                     'transition-duration': '0.1s'
                 }
             },
@@ -328,27 +330,43 @@ function initCy(elements, layoutName = 'dagre') {
 
     // 事件绑定：点击高亮逻辑
     cy.on('tap', 'node', function (evt) {
-        if (Date.now() - lastNodeDoubleClickAt < 250) {
+
+        // 1. 如果此时存在 timer，说明这是"双击"动作中的第二次点击
+        // 我们要立刻清除单击定时器，并阻止后续的单击逻辑，把舞台留给 dblclick
+        if (tapTimer) {
+            clearTimeout(tapTimer);
+            tapTimer = null;
             return;
         }
+
         const node = evt.target;
 
-        // 如果是在线体视图，点击进入车型视图
-        if (currentView === 'line') {
-            switchView('car');
-            return;
-        }
+        // 设置定时器，延迟200毫秒执行单击逻辑
+        tapTimer = setTimeout(() => {
+            // 如果是在线体视图，点击进入车型视图
+            if (currentView === 'line') {
+                switchView('car');
+            }
 
-        // 清除之前的状态
-        cy.elements().removeClass('dimmed highlighted');
+            // 清除之前的状态
+            cy.elements().removeClass('dimmed highlighted');
 
-        // 逻辑：高亮被点击节点 + 所有祖先与子孙节点（完整链路）
-        const lineage = node.predecessors().add(node).add(node.successors());
+            console.log("触发单击：高亮链路");
+            // 逻辑：高亮被点击节点 + 所有祖先与子孙节点（完整链路）
+            const lineage = node.predecessors().add(node).add(node.successors());
 
-        cy.elements().addClass('dimmed');
-        lineage.removeClass('dimmed').addClass('highlighted');
-        applyTypeHighlights();
-        hideNodePopover();
+            cy.elements().addClass('dimmed');
+            lineage.removeClass('dimmed').addClass('highlighted');
+            applyTypeHighlights();
+            hideNodePopover();
+            // --- 单击逻辑结束 ---
+
+            // 【核心修复】: 定时器执行完毕后，必须手动将 ID 置空！
+            // 否则下一次点击会误以为还有一个挂起的定时器而被直接 return 掉
+            tapTimer = null;
+        }, 250);
+
+
     });
 
     // 点击空白处恢复
@@ -360,17 +378,29 @@ function initCy(elements, layoutName = 'dagre') {
         }
     });
 
+    // 双击节点：弹出弹窗，展示属性信息:文件路径、创建时间、修改时间
     cy.on('dblclick', 'node', function (evt) {
+        // 双击保险：再次尝试清除定时器（防止极端情况）
+        if (tapTimer) {
+            clearTimeout(tapTimer);
+            tapTimer = null;
+        }
+
+
+        console.log("触发双击：属性视图");
         lastNodeDoubleClickAt = Date.now();
         const node = evt.target;
+        // 获取位置
         const renderedPosition = evt.renderedPosition || node.renderedPosition();
         const position = {
             x: renderedPosition.x,
             y: renderedPosition.y
         };
+        // 显示弹窗
         showNodePopover(node, 'left', position);
     });
 
+    // 右键点击节点：弹出弹窗，展示调用的上下文信息
     cy.on('cxttap', 'node', function (evt) {
         const node = evt.target;
         const renderedPosition = evt.renderedPosition || node.renderedPosition();
@@ -782,10 +812,17 @@ function initNodeControlPanel() {
     });
 
     document.addEventListener('click', (event) => {
+        // 1. 如果弹窗本来就是关着的，不用管
         if (!dom.nodePopover || dom.nodePopover.classList.contains('hidden')) {
             return;
         }
+        // 2. 如果点击的是弹窗自己内部，不用管
         if (dom.nodePopover.contains(event.target)) {
+            return;
+        }
+        // 3. 【新增关键代码】如果点击的是 Cytoscape 画布区域，也不用管
+        // 因为 cy.on('tap') 会专门处理画布内的关闭逻辑，这里处理会造成冲突
+        if (dom.cy.contains(event.target)) {
             return;
         }
         hideNodePopover();

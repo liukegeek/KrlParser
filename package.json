@@ -1,0 +1,6 @@
+{
+  "dependencies": {
+    "cytoscape-dagre": "^2.5.0",
+    "dagre": "^0.8.5"
+  }
+}

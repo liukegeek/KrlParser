@@ -40,8 +40,106 @@ const dom = {
     configUploadButton: document.getElementById('configUploadButton'),
     fileUploadText: document.getElementById('fileUploadText'),
     configUploadText: document.getElementById('configUploadText'),
-    startAnalysisBtn: document.getElementById('startAnalysisBtn')
+    startAnalysisBtn: document.getElementById('startAnalysisBtn'),
+    nodePopover: document.getElementById('nodePopover'),
+    nodeControlPanel: document.getElementById('nodeControlPanel'),
+    nodeControlTrigger: document.getElementById('nodeControlTrigger'),
+    nodeControlClose: document.getElementById('nodeControlClose')
 };
+
+const nodeTypeGroups = [
+    {label: 'Cell', types: ['CEll']},
+    {label: 'P程序', types: ['P_PROGRAM', 'VIRTUAL']},
+    {label: '车型代码', types: ['CAR_CODE']},
+    {label: '车型程序', types: ['CAR_PROGRAM']},
+    {label: '轨迹程序', types: ['ROUTE_PROCESS']}
+];
+
+const nodeTypeBaseSizes = {
+    CEll: {width: 82, height: 82, fontSize: 12, textMaxWidth: 90},
+    CAR_CODE: {width: 82, height: 82, fontSize: 12, textMaxWidth: 90},
+    P_PROGRAM: {width: 120, height: 44, fontSize: 12, textMaxWidth: 100},
+    VIRTUAL: {width: 120, height: 44, fontSize: 12, textMaxWidth: 100},
+    CAR_PROGRAM: {width: 120, height: 44, fontSize: 12, textMaxWidth: 100},
+    ROUTE_PROCESS: {width: 120, height: 44, fontSize: 12, textMaxWidth: 100}
+};
+
+const nodeTypeScale = new Map();
+const activeTypeSelections = new Set();
+let popoverDragState = null;
+let lastNodeDoubleClickAt = 0;
+let tapTimer = null;
+
+function hideNodePopover() {
+    if (dom.nodePopover) {
+        dom.nodePopover.classList.add('hidden');
+        dom.nodePopover.classList.remove('node-popover-resizable');
+    }
+}
+
+function createPopoverRow(label, value) {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'flex flex-col gap-1';
+    const title = document.createElement('span');
+    title.className = 'text-slate-400';
+    title.textContent = label;
+    const content = document.createElement('div');
+    content.className = 'node-popover-content';
+    content.textContent = value || '--';
+    wrapper.appendChild(title);
+    wrapper.appendChild(content);
+    return wrapper;
+}
+
+function showNodePopover(node, side, anchorPosition) {
+    if (!dom.nodePopover) {
+        return;
+    }
+    dom.nodePopover.innerHTML = '';
+    dom.nodePopover.classList.remove('node-popover-resizable');
+    const title = document.createElement('div');
+    title.className = 'node-popover-title';
+    title.textContent = node.data('label') || node.id();
+    dom.nodePopover.appendChild(title);
+
+    if (side === 'left') {
+        const propertyMap = node.data('propertyMap') || {};
+        dom.nodePopover.appendChild(createPopoverRow('文件路径', propertyMap.srcFilePath));
+        dom.nodePopover.appendChild(createPopoverRow('创建时间', propertyMap.createTime));
+        dom.nodePopover.appendChild(createPopoverRow('修改时间', propertyMap.modifyTime));
+    } else {
+        dom.nodePopover.classList.add('node-popover-resizable');
+        const relevantInfo = node.data('relevantInfo');
+        dom.nodePopover.appendChild(createPopoverRow('相关信息', relevantInfo || '--'));
+    }
+    const containerRect = dom.cy.getBoundingClientRect();
+    const parentRect = dom.nodePopover.offsetParent
+        ? dom.nodePopover.offsetParent.getBoundingClientRect()
+        : {left: 0, top: 0};
+    dom.nodePopover.style.left = `${containerRect.left + anchorPosition.x - parentRect.left + 16}px`;
+    dom.nodePopover.style.top = `${containerRect.top + anchorPosition.y - parentRect.top + 16}px`;
+    dom.nodePopover.classList.remove('hidden');
+
+    title.addEventListener('mousedown', (event) => {
+        event.preventDefault();
+        popoverDragState = {
+            offsetX: event.clientX - dom.nodePopover.offsetLeft,
+            offsetY: event.clientY - dom.nodePopover.offsetTop
+        };
+    });
+}
+
+document.addEventListener('mousemove', (event) => {
+    if (!popoverDragState || !dom.nodePopover) {
+        return;
+    }
+    dom.nodePopover.style.left = `${event.clientX - popoverDragState.offsetX}px`;
+    dom.nodePopover.style.top = `${event.clientY - popoverDragState.offsetY}px`;
+});
+
+document.addEventListener('mouseup', () => {
+    popoverDragState = null;
+});
 
 // -------------------------------------------------------------------------
 // 核心功能：Cytoscape 初始化与配置
@@ -55,6 +153,7 @@ function initCy(elements, layoutName = 'dagre') {
             console.warn("Error destroying cy instance:", e);
         }
         cy = null;
+        hideNodePopover();
     }
 
     // 布局配置
@@ -134,9 +233,9 @@ function initCy(elements, layoutName = 'dagre') {
             },
 
             // ---------------- 特定类型节点样式 (核心需求) ----------------
-            // 1. CELL / CAR_CODE: 圆形，橙色
+            // 1. CEll / CAR_CODE: 圆形，橙色
             {
-                selector: 'node[type="CELL"], node[type="CAR_CODE"]',
+                selector: 'node[type="CEll"], node[type="CAR_CODE"]',
                 style: {
                     'shape': 'ellipse',
                     'background-color': '#f97316',
@@ -149,15 +248,15 @@ function initCy(elements, layoutName = 'dagre') {
                     'shadow-opacity': 1
                 }
             },
-            // 2. 普通 SRC 程序: 圆角矩形，蓝色
+            // 2. P 程序 / 车型程序 / 轨迹程序 / 虚拟节点: 圆角矩形，蓝色
             {
-                selector: 'node[type="SRC"]',
+                selector: 'node[type="P_PROGRAM"], node[type="VIRTUAL"], node[type="CAR_PROGRAM"], node[type="ROUTE_PROCESS"], node[type="SRC"]',
                 style: {
                     'shape': 'round-rectangle',
                     'background-color': '#3b82f6',
                     'width': '120px',
                     'height': '44px',
-                    'border-radius': '10px'
+                    'corner-radius': '10px'
                 }
             },
             // 3. DAT / 系统文件: 灰蓝色
@@ -168,7 +267,7 @@ function initCy(elements, layoutName = 'dagre') {
                     'background-color': '#64748b',
                     'width': '120px',
                     'height': '40px',
-                    'border-radius': '10px'
+                    'corner-radius': '10px'
                 }
             },
             // 4. 线体视图的机器人节点: 大椭圆，深色
@@ -206,14 +305,15 @@ function initCy(elements, layoutName = 'dagre') {
             {
                 selector: '.highlighted',
                 style: {
-                    'background-color': '#2563eb',
-                    'line-color': '#2563eb',
-                    'target-arrow-color': '#2563eb',
+                    'background-color': '#286395',
+                    'line-color': '#286395',
+                    'color': '#ffffff',
+                    'target-arrow-color': '#286395',
                     'transition-duration': '0.1s'
                 }
             },
             {
-                selector: 'node[type="CELL"].highlighted, node[type="CAR_CODE"].highlighted',
+                selector: 'node[type="CEll"].highlighted, node[type="CAR_CODE"].highlighted',
                 style: {
                     'background-color': '#c2410c'
                 }
@@ -230,29 +330,85 @@ function initCy(elements, layoutName = 'dagre') {
 
     // 事件绑定：点击高亮逻辑
     cy.on('tap', 'node', function (evt) {
-        const node = evt.target;
 
-        // 如果是在线体视图，点击进入车型视图
-        if (currentView === 'line') {
-            switchView('car');
+        // 1. 如果此时存在 timer，说明这是"双击"动作中的第二次点击
+        // 我们要立刻清除单击定时器，并阻止后续的单击逻辑，把舞台留给 dblclick
+        if (tapTimer) {
+            clearTimeout(tapTimer);
+            tapTimer = null;
             return;
         }
 
-        // 清除之前的状态
-        cy.elements().removeClass('dimmed highlighted');
+        const node = evt.target;
 
-        // 逻辑：高亮被点击节点 + 所有祖先与子孙节点（完整链路）
-        const lineage = node.predecessors().add(node).add(node.successors());
+        // 设置定时器，延迟200毫秒执行单击逻辑
+        tapTimer = setTimeout(() => {
+            // 如果是在线体视图，点击进入车型视图
+            if (currentView === 'line') {
+                switchView('car');
+            }
 
-        cy.elements().addClass('dimmed');
-        lineage.removeClass('dimmed').addClass('highlighted');
+            // 清除之前的状态
+            cy.elements().removeClass('dimmed highlighted');
+
+            console.log("触发单击：高亮链路");
+            // 逻辑：高亮被点击节点 + 所有祖先与子孙节点（完整链路）
+            const lineage = node.predecessors().add(node).add(node.successors());
+
+            cy.elements().addClass('dimmed');
+            lineage.removeClass('dimmed').addClass('highlighted');
+            applyTypeHighlights();
+            hideNodePopover();
+            // --- 单击逻辑结束 ---
+
+            // 【核心修复】: 定时器执行完毕后，必须手动将 ID 置空！
+            // 否则下一次点击会误以为还有一个挂起的定时器而被直接 return 掉
+            tapTimer = null;
+        }, 250);
+
+
     });
 
     // 点击空白处恢复
     cy.on('tap', function (evt) {
         if (evt.target === cy) {
             cy.elements().removeClass('dimmed highlighted');
+            applyTypeHighlights();
+            hideNodePopover();
         }
+    });
+
+    // 双击节点：弹出弹窗，展示属性信息:文件路径、创建时间、修改时间
+    cy.on('dblclick', 'node', function (evt) {
+        // 双击保险：再次尝试清除定时器（防止极端情况）
+        if (tapTimer) {
+            clearTimeout(tapTimer);
+            tapTimer = null;
+        }
+
+
+        console.log("触发双击：属性视图");
+        lastNodeDoubleClickAt = Date.now();
+        const node = evt.target;
+        // 获取位置
+        const renderedPosition = evt.renderedPosition || node.renderedPosition();
+        const position = {
+            x: renderedPosition.x,
+            y: renderedPosition.y
+        };
+        // 显示弹窗
+        showNodePopover(node, 'left', position);
+    });
+
+    // 右键点击节点：弹出弹窗，展示调用的上下文信息
+    cy.on('cxttap', 'node', function (evt) {
+        const node = evt.target;
+        const renderedPosition = evt.renderedPosition || node.renderedPosition();
+        const position = {
+            x: renderedPosition.x,
+            y: renderedPosition.y
+        };
+        showNodePopover(node, 'right', position);
     });
 }
 
@@ -274,6 +430,11 @@ function switchView(viewName) {
         // 隐藏详情侧边栏
         toggleSidebar(false);
         dom.sidebarTrigger.classList.add('hidden');
+        toggleNodeControls(false);
+        if (dom.nodeControlTrigger) {
+            dom.nodeControlTrigger.classList.add('hidden');
+        }
+        hideNodePopover();
 
         renderLineGraph();
     } else {
@@ -286,6 +447,10 @@ function switchView(viewName) {
         if (parsedData) {
             toggleSidebar(false);
             dom.sidebarTrigger.classList.remove('hidden');
+        }
+        toggleNodeControls(false);
+        if (dom.nodeControlTrigger) {
+            dom.nodeControlTrigger.classList.remove('hidden');
         }
 
         renderCarGraph();
@@ -322,15 +487,21 @@ function renderCarGraph() {
 
     // 1. 添加节点
     parsedData.modules.forEach(mod => {
-        if (!nodes.has(mod.name)) {
+        const nodeId = mod.name || mod.id;
+        if (!nodeId || nodes.has(nodeId)) {
+            return;
+        }
+        if (!nodes.has(nodeId)) {
             elements.push({
                 data: {
-                    id: mod.name,
-                    label: mod.value || mod.name,
-                    type: mod.type
+                    id: nodeId,
+                    label: mod.value || nodeId,
+                    type: mod.type,
+                    propertyMap: mod.propertyMap || {},
+                    relevantInfo: mod.relevantInfo || ''
                 }
             });
-            nodes.add(mod.name);
+            nodes.add(nodeId);
         }
     });
 
@@ -355,6 +526,8 @@ function renderCarGraph() {
     });
 
     initCy(elements, 'dagre');
+    applyAllNodeTypeScales();
+    applyTypeHighlights();
     updateSidebar(parsedData);
 }
 
@@ -363,25 +536,32 @@ function renderCarGraph() {
 // -------------------------------------------------------------------------
 
 function mapNodeType(rawType) {
-    const normalized = String(rawType || '').toUpperCase();
+    const rawString = String(rawType || '');
+    if (rawString === 'CEll') {
+        return 'CEll';
+    }
+    const normalized = rawString.toUpperCase();
     switch (normalized) {
         case 'CELL':
         case 'CELL_PROGRAM':
         case 'CELL_PROGRAMS':
-            return 'CELL';
+            return 'CEll';
         case 'CAR_CODE':
             return 'CAR_CODE';
+        case 'P_PROGRAM':
+            return 'P_PROGRAM';
+        case 'VIRTUAL':
+            return 'VIRTUAL';
+        case 'CAR_PROGRAM':
+            return 'CAR_PROGRAM';
+        case 'ROUTE_PROCESS':
+            return 'ROUTE_PROCESS';
         case 'DAT':
         case 'SYSTEM':
-        case 'VIRTUAL':
-            return 'SYSTEM';
-        case 'CAR_PROGRAM':
-        case 'P_PROGRAM':
-        case 'ROUTE_PROCESS':
         case 'SRC':
             return 'SRC';
         default:
-            return 'SRC';
+            return normalized || 'SRC';
     }
 }
 
@@ -424,7 +604,9 @@ function buildGraphFromCallNode(rootNode) {
             modules.push({
                 name: node.id,
                 value: node.value || node.id,
-                type: mapNodeType(node.nodeType)
+                type: mapNodeType(node.nodeType),
+                propertyMap: node.propertyMap || {},
+                relevantInfo: node.relevantInfo || ''
             });
             visited.add(node.id);
         }
@@ -455,8 +637,17 @@ function normalizeRobotInfo(raw) {
     }
 
     if (Array.isArray(raw.modules) && Array.isArray(raw.calls)) {
+        const modules = raw.modules.map((mod) => ({
+            ...mod,
+            name: mod.name || mod.id,
+            value: mod.value || mod.name || mod.id,
+            type: mapNodeType(mod.type || mod.nodeType),
+            propertyMap: mod.propertyMap || {},
+            relevantInfo: mod.relevantInfo || ''
+        }));
         return {
             ...raw,
+            modules,
             techPacks: normalizeTechPacks(raw.techPacks || raw.techPackList)
         };
     }
@@ -509,6 +700,149 @@ function updateSidebar(data) {
         dom.techPackList.innerHTML = '<div class="text-sm text-slate-400 italic">暂无数据</div>';
     }
 }
+
+function toggleNodeControls(forceState) {
+    if (!dom.nodeControlPanel || !dom.nodeControlTrigger) {
+        return;
+    }
+    const isHidden = dom.nodeControlPanel.classList.contains('-translate-x-full');
+    const shouldShow = forceState !== undefined ? forceState : isHidden;
+
+    if (shouldShow) {
+        dom.nodeControlPanel.classList.remove('-translate-x-full', 'opacity-0', 'pointer-events-none');
+        dom.nodeControlTrigger.classList.add('hidden');
+    } else {
+        dom.nodeControlPanel.classList.add('-translate-x-full', 'opacity-0', 'pointer-events-none');
+        dom.nodeControlTrigger.classList.remove('hidden');
+    }
+}
+
+function parseNodeTypes(raw) {
+    return raw.split(',').map(type => type.trim()).filter(Boolean);
+}
+
+function getScaleKey(types) {
+    return types.slice().sort().join('|');
+}
+
+function applyNodeTypeScale(types, scale) {
+    if (!cy) {
+        return;
+    }
+    types.forEach((type) => {
+        const base = nodeTypeBaseSizes[type];
+        if (!base) {
+            return;
+        }
+        cy.style()
+            .selector(`node[type="${type}"]`)
+            .style({
+                width: `${base.width * scale}px`,
+                height: `${base.height * scale}px`,
+                'font-size': `${base.fontSize * scale}px`,
+                'text-max-width': `${base.textMaxWidth * scale}px`
+            })
+            .update();
+    });
+}
+
+function applyAllNodeTypeScales() {
+    nodeTypeGroups.forEach((group) => {
+        const key = getScaleKey(group.types);
+        const scale = nodeTypeScale.get(key) || 1;
+        applyNodeTypeScale(group.types, scale);
+    });
+}
+
+function selectNodesByTypes(types) {
+    if (!cy) {
+        return;
+    }
+    cy.nodes().unselect();
+    cy.elements().removeClass('dimmed highlighted');
+    applyTypeHighlights();
+}
+
+function applyTypeHighlights() {
+    if (!cy) {
+        return;
+    }
+    if (activeTypeSelections.size === 0) {
+        return;
+    }
+    const selector = Array.from(activeTypeSelections)
+        .map((type) => `node[type="${type}"]`)
+        .join(', ');
+    if (!selector) {
+        return;
+    }
+    cy.nodes(selector).removeClass('dimmed').addClass('highlighted');
+}
+
+function initNodeControlPanel() {
+    const buttons = document.querySelectorAll('.node-type-button');
+    const sliders = document.querySelectorAll('.node-size-slider');
+
+    buttons.forEach((button) => {
+        button.addEventListener('click', () => {
+            const types = parseNodeTypes(button.dataset.nodeTypes || '');
+            const isActive = button.classList.contains('active');
+            if (isActive) {
+                button.classList.remove('active');
+                types.forEach((type) => activeTypeSelections.delete(type));
+            } else {
+                button.classList.add('active');
+                types.forEach((type) => activeTypeSelections.add(type));
+            }
+            selectNodesByTypes(types);
+        });
+    });
+
+    sliders.forEach((slider) => {
+        const types = parseNodeTypes(slider.dataset.nodeTypes || '');
+        const scaleKey = getScaleKey(types);
+        const scaleValue = Number.parseFloat(slider.value) || 1;
+        nodeTypeScale.set(scaleKey, scaleValue);
+
+        slider.addEventListener('input', () => {
+            const newScale = Number.parseFloat(slider.value) || 1;
+            nodeTypeScale.set(scaleKey, newScale);
+            applyNodeTypeScale(types, newScale);
+        });
+    });
+
+    document.addEventListener('click', (event) => {
+        // 1. 如果弹窗本来就是关着的，不用管
+        if (!dom.nodePopover || dom.nodePopover.classList.contains('hidden')) {
+            return;
+        }
+        // 2. 如果点击的是弹窗自己内部，不用管
+        if (dom.nodePopover.contains(event.target)) {
+            return;
+        }
+        // 3. 【新增关键代码】如果点击的是 Cytoscape 画布区域，也不用管
+        // 因为 cy.on('tap') 会专门处理画布内的关闭逻辑，这里处理会造成冲突
+        if (dom.cy.contains(event.target)) {
+            return;
+        }
+        hideNodePopover();
+    });
+
+    if (dom.cy) {
+        dom.cy.addEventListener('contextmenu', (event) => {
+            event.preventDefault();
+        });
+    }
+
+    if (dom.nodeControlTrigger) {
+        dom.nodeControlTrigger.addEventListener('click', () => toggleNodeControls());
+    }
+    if (dom.nodeControlClose) {
+        dom.nodeControlClose.addEventListener('click', () => toggleNodeControls(false));
+    }
+}
+
+initNodeControlPanel();
 
 // -------------------------------------------------------------------------
 // 上传处理
