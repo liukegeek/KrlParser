@@ -1,1 +1,91 @@
-name:
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Build JAR
+        run: mvn -B -DskipTests package
+
+      - name: Package app image
+        shell: bash
+        run: |
+          set -euo pipefail
+          APP_NAME="KRLParser"
+          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+          else
+            VERSION="dev-${GITHUB_SHA::7}"
+          fi
+
+          rm -rf build
+          mkdir -p build/input build/dist
+
+          JAR_PATH=$(ls krl-web/target/krl-web-*.jar | grep -v '\.jar\.original$' | head -n 1)
+          if [[ -z "$JAR_PATH" ]]; then
+            echo "Packaged JAR not found in krl-web/target" >&2
+            exit 1
+          fi
+          cp "$JAR_PATH" build/input/app.jar
+
+          jpackage \
+            --type app-image \
+            --name "$APP_NAME" \
+            --app-version "$VERSION" \
+            --input build/input \
+            --main-jar app.jar \
+            --main-class tech.waitforu.krlweb.KrlWebApplication \
+            --add-modules ALL-MODULE-PATH \
+            --dest build/dist
+
+          if [[ "${{ runner.os }}" == "Windows" ]]; then
+            7z a "${APP_NAME}-${VERSION}-windows.zip" "build/dist/${APP_NAME}"
+          else
+            ditto -c -k --sequesterRsrc --keepParent "build/dist/${APP_NAME}.app" "${APP_NAME}-${VERSION}-macos.zip"
+          fi
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ runner.os }}-app
+          path: |
+            *.zip
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Publish release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/**.zip
