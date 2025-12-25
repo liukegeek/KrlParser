@@ -4,14 +4,7 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="441c94db-8d38-4ead-9894-353c9b0ad5f0" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/krl-web/src/main/resources/logback-spring.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/krl-web/src/main/java/tech/waitforu/krlweb/KrlWebApplication.java" beforeDir="false" afterPath="$PROJECT_DIR$/krl-web/src/main/java/tech/waitforu/krlweb/KrlWebApplication.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/krl-web/src/main/resources/application.yml" beforeDir="false" afterPath="$PROJECT_DIR$/krl-web/src/main/resources/application.yml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/krl-web/target/classes/application.yml" beforeDir="false" afterPath="$PROJECT_DIR$/krl-web/target/classes/application.yml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pom.xml" beforeDir="false" afterPath="$PROJECT_DIR$/pom.xml" afterDir="false" />
-    </list>
+    <list default="true" id="441c94db-8d38-4ead-9894-353c9b0ad5f0" name="Changes" comment="" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -283,7 +276,7 @@
       <workItem from="1766321229141" duration="208000" />
       <workItem from="1766321475246" duration="5814000" />
       <workItem from="1766400986234" duration="12247000" />
-      <workItem from="1766588425571" duration="20061000" />
+      <workItem from="1766588425571" duration="22800000" />
     </task>
     <servers />
   </component>
