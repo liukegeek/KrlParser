@@ -74,7 +74,29 @@
                         <encoding>${project.build.sourceEncoding}</encoding>
                     </configuration>
                 </plugin>
+
+                <plugin>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-maven-plugin</artifactId>
+                    <configuration>
+                        <!-- 如果你有多个 @SpringBootApplication，显式指定主类；否则可省略 -->
+                        <mainClass>tech.waitforu.krlweb.KrlWebApplication</mainClass>
+                        <layers enabled="true"/>
+                    </configuration>
+                    <executions>
+                        <!--增加 <goal>repackage</goal> → mvn package 就会自动产出 可执行 jar（而不是普通 jar）。-->
+                        <!--之后就能 java -jar target/xxx.jar 启动了（当然我们最终要用 jlink+jpackage 封装）。-->
+                        <execution>
+                            <goals>
+                                <goal>repackage</goal>
+                            </goals>
+                        </execution>
+                    </executions>
+                </plugin>
+
             </plugins>
+
+
         </pluginManagement>
     </build>
 </project>

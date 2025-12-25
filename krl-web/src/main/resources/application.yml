@@ -11,3 +11,17 @@ spring:
     multipart:
       max-file-size: 100MB    # 单个文件最大大小
       max-request-size: 1000MB # 单次请求最大大小（包含所有文件）
+
+logging:
+  file:
+    # 设定日志存储的目录和文件名
+    name: logs/krl-analysis.log
+  logback:
+    rollingpolicy:
+      # 设置日志保留策略，防止磁盘满
+      max-file-size: 10MB
+      max-history: 7
+  level:
+    root: INFO
+    # 如果你想看更详细的 Spring 启动过程，可以设为 DEBUG
+    org.springframework: INFO

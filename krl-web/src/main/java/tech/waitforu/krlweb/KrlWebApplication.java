@@ -26,6 +26,10 @@ public class KrlWebApplication {
     private static final Logger LOGGER = LogManager.getLogger(KrlWebApplication.class);
 
     public static void main(String[] args) {
+        // 确保在 Spring 启动前设置，Logback 才能读取到
+        if (System.getProperty("log.dir") == null) {
+            System.setProperty("log.dir", "logs");
+        }
 
         //System.getProperty 读取的是操作系统的环境变量或 JVM 启动参数。
         //YAML 加载时机：application.yml 是由 Spring 框架加载的。在你调用 SpringApplication.run 之前，Spring 的环境还没有初始化，它根本不知道 YAML 文件的存在，更读不到里面的 port: 2026。
