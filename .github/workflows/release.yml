@@ -31,8 +31,9 @@ jobs:
           distribution: temurin
           java-version: '21'
 
-      - name: Capture Maven coordinates
+      - name: Capture Maven coordinates (krl-web module)
         id: coordinates
+        working-directory: ./krl-web
         run: |
           ARTIFACT_ID=$(mvn -q -DforceStdout help:evaluate -Dexpression=project.artifactId)
           VERSION=$(mvn -q -DforceStdout help:evaluate -Dexpression=project.version)
@@ -43,9 +44,11 @@ jobs:
         run: echo "APP_VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
 
       - name: Build application JAR
+        working-directory: ./krl-web
         run: mvn -DskipTests package
 
       - name: Create custom runtime
+        working-directory: ./krl-web
         run: |
           mkdir -p build
           "$JAVA_HOME/bin/jlink" \
@@ -56,43 +59,55 @@ jobs:
 
       - name: Package app image (macOS)
         if: matrix.os == 'macos-latest'
+        working-directory: ./krl-web
         run: |
+          # Find the actual executable JAR file (Spring Boot repackaged JAR)
+          MAIN_JAR=$(find target -name "*.jar" | grep -v "sources.jar" | grep -v "javadoc.jar" | head -1)
+          echo "Found main JAR: $MAIN_JAR"
+          
           "$JAVA_HOME/bin/jpackage" \
             --name FanucCommentTool \
             --app-version "$APP_VERSION" \
             --type app-image \
             --input target \
-            --main-jar "$ARTIFACT_ID-$MAVEN_VERSION.jar" \
+            --main-jar "$(basename $MAIN_JAR)" \
             --runtime-image build/runtime \
             --vendor "BYD Tools" \
-            --icon icons/macIcon.icns \
+            --icon ../icons/macIcon.icns \
             --java-options "-Dserver.port=8910" \
             --mac-package-identifier com.byd.tools.fanuccommenttool \
             --dest build/dist
 
       - name: Package app image (Windows)
         if: matrix.os == 'windows-latest'
+        working-directory: ./krl-web
         run: |
+          # Find the actual executable JAR file (Spring Boot repackaged JAR)
+          MAIN_JAR=$(find target -name "*.jar" | grep -v "sources.jar" | grep -v "javadoc.jar" | head -1)
+          echo "Found main JAR: $MAIN_JAR"
+          
           "$JAVA_HOME/bin/jpackage" \
             --name FanucCommentTool \
             --app-version "$APP_VERSION" \
             --type app-image \
             --input target \
-            --main-jar "$ARTIFACT_ID-$MAVEN_VERSION.jar" \
+            --main-jar "$(basename $MAIN_JAR)" \
             --runtime-image build/runtime \
             --vendor "BYD Tools" \
-            --icon icons/windowsIcon.ico \
+            --icon ../icons/windowsIcon.ico \
             --java-options "-Dserver.port=8910" \
             --dest build/dist
 
       - name: Archive macOS image
         if: matrix.os == 'macos-latest'
+        working-directory: ./krl-web
         run: |
           mkdir -p build/packages
           ditto -c -k --sequesterRsrc --keepParent "build/dist/FanucCommentTool.app" "build/packages/FanucCommentTool-macos-${APP_VERSION}.zip"
       
       - name: Archive Windows image
         if: matrix.os == 'windows-latest'
+        working-directory: ./krl-web
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Path build\packages -Force | Out-Null
@@ -104,7 +119,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: FanucCommentTool-${{ matrix.artifact_suffix }}
-          path: build/packages/*.zip
+          path: ./krl-web/build/packages/*.zip
           if-no-files-found: error
 
   release:
