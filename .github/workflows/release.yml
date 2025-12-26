@@ -1,57 +1,122 @@
+# 工作流名称：Release
 name: Release
 
+# 工作流触发条件
 on:
+  # 当推送标签以v开头时触发（如v1.0.0）
   push:
     tags:
       - 'v*'
+  # 允许手动触发工作流
   workflow_dispatch:
 
+# 权限设置：允许写入仓库内容
 permissions:
   contents: write
 
+# 工作任务定义
 jobs:
+  # 构建任务
   build:
+    # 任务名称：包含当前操作系统信息
     name: Build (${{ matrix.os }})
+    # 运行环境：根据矩阵配置选择操作系统
     runs-on: ${{ matrix.os }}
+    # 构建策略
     strategy:
+      # 当一个操作系统构建失败时，继续其他操作系统的构建
       fail-fast: false
+      # 构建矩阵：同时构建macOS和Windows版本
       matrix:
-        os: [macos-latest, windows-latest]
+        os: [ macos-latest, windows-latest ]
+    # 构建步骤
     steps:
+      # 步骤1：检出代码
       - name: Checkout
         uses: actions/checkout@v4
 
+      # 步骤2：设置JDK环境
       - name: Set up JDK
         uses: actions/setup-java@v4
         with:
+          # JDK发行版：Temurin（AdoptOpenJDK的后继者）
           distribution: temurin
+          # JDK版本：21
           java-version: '21'
+          # 启用Maven缓存，加快构建速度
           cache: maven
 
-      - name: Build JAR
-        run: mvn -B -DskipTests package
+      # 步骤3：使用Maven构建JAR文件
+      - name: Build with Maven
+        # 运行Maven命令：必须在根目录运行 install，确保 krl-core 能被 krl-web 引用
+        # -B: 以批处理模式运行，减少输出
+        # -DskipTests: 跳过测试，加快构建速度
+        # package: 执行打包命令，生成JAR文件
+        run: mvn -B clean install -DskipTests
 
+      # 步骤4：打包应用镜像
       - name: Package app image
+        # 使用bash shell执行命令
         shell: bash
-        run: |
+        run:
+          # 设置bash执行选项：
+          # -e: 遇到错误立即退出
+          # -u: 引用未定义变量时退出
+          # -o pipefail: 管道命令中任何一个失败则整个命令失败
           set -euo pipefail
+          
+          # 应用名称
           APP_NAME="KRLParser"
+          
+          # 确定版本号：
+          # 如果是标签推送，则使用标签名（去掉v前缀）
+          # 否则使用开发版本号（dev-加上commit哈希的前7位）
           if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
             VERSION="${GITHUB_REF_NAME#v}"
           else
             VERSION="dev-${GITHUB_SHA::7}"
           fi
+          
+          # 确定图标路径 (假设在根目录/icons)
+          if [[ "${{ runner.os }}" == "Windows" ]]; then
+          ICON_PATH="icons/windowsIcon.ico"
+          else
+          ICON_PATH="icons/macIcon.icns"
+          fi
 
+          # 清理并创建打包专用工作区
           rm -rf build
           mkdir -p build/input build/dist
-
+          
+          
+          
+          
+          # 查找打包好的Spring Boot JAR文件(install 后文件肯定在)： 
+          # 1. 列出krl-web/target目录下的krl-web-*.jar文件
+          # 2. 排除.jar.original文件（Maven打包生成的原始JAR）
+          # 3. 取第一个匹配的文件
           JAR_PATH=$(ls krl-web/target/krl-web-*.jar | grep -v '\.jar\.original$' | head -n 1)
+          
+          # 如果未找到JAR文件，则报错退出
           if [[ -z "$JAR_PATH" ]]; then
             echo "Packaged JAR not found in krl-web/target" >&2
             exit 1
           fi
+          
+          # 复制JAR文件到构建目录
           cp "$JAR_PATH" build/input/app.jar
 
+          # 使用jpackage工具打包应用镜像：
+          # --type app-image: 生成应用镜像
+          # --name: 应用名称
+          # --app-version: 应用版本
+          # --input: 输入目录（包含JAR文件）
+          # --main-jar: 主JAR文件
+          # --main-class: 主类名
+          # --icon: 图标文件路径（根据操作系统不同）
+          # --add-modules: 添加所有模块路径,对于非模块化的 SpringBoot Fat Jar 通常不需要
+          # --vendor: 供应商名称
+          # --dest: 输出目录
           jpackage \
             --type app-image \
             --name "$APP_NAME" \
@@ -59,33 +124,53 @@ jobs:
             --input build/input \
             --main-jar app.jar \
             --main-class tech.waitforu.krlweb.KrlWebApplication \
-            --add-modules ALL-MODULE-PATH \
+            --icon "$ICON_PATH" \
+#            --add-modules ALL-MODULE-PATH \
+            --vendor "WaitForU" \
             --dest build/dist
 
+          # 根据操作系统打包成不同格式：
+          # Windows使用7z打包为ZIP文件
+          # macOS使用ditto打包为ZIP文件（保留.app结构）
           if [[ "${{ runner.os }}" == "Windows" ]]; then
             7z a "${APP_NAME}-${VERSION}-windows.zip" "build/dist/${APP_NAME}"
           else
+            # macOS 需要保持权限，使用 ditto 命令
             ditto -c -k --sequesterRsrc --keepParent "build/dist/${APP_NAME}.app" "${APP_NAME}-${VERSION}-macos.zip"
           fi
 
+      # 步骤5：上传构建工件
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
+          # 工件名称：包含操作系统信息
           name: ${{ runner.os }}-app
+          # 上传路径：所有ZIP文件
           path: |
             *.zip
 
+  # 发布任务
   release:
+    # 仅当推送标签时执行此任务
     if: startsWith(github.ref, 'refs/tags/')
+    # 依赖于build任务完成
     needs: build
+    # 运行环境：Ubuntu
     runs-on: ubuntu-latest
+    # 发布步骤
     steps:
+      # 步骤1：下载所有构建工件
       - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
+          # 下载到artifacts目录
           path: artifacts
+          # 必须加上这个，否则文件会散落在各子文件夹里，通配符匹配不到
+          merge-multiple: true
 
+      # 步骤2：发布到GitHub Release
       - name: Publish release assets
         uses: softprops/action-gh-release@v2
         with:
+          # 发布文件：artifacts目录下的所有ZIP文件
           files: artifacts/**.zip
