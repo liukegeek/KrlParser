@@ -58,89 +58,67 @@ jobs:
       - name: Package app image
         # 使用bash shell执行命令
         shell: bash
-
-
-        #
-        # 设置bash执行选项：
-        # -e: 遇到错误立即退出
-        # -u: 引用未定义变量时退出
-        # -o pipefail: 管道命令中任何一个失败则整个命令失败
-
-        # 应用名称：KRLParser
-
-        # 确定版本号：
-        # 如果是标签推送，则使用标签名（去掉v前缀）
-        # 否则使用开发版本号（dev-加上commit哈希的前7位）
-
-        # 确定图标路径 (假设在根目录/icons)
-
-        # -ico: Windows图标文件格式
-
-        # -icns: macOS图标文件格式
-
-        # 清理并创建打包专用工作区
-
-
-        # 查找打包好的Spring Boot JAR文件(install 后文件肯定在)：
-        # 1. 列出krl-web/target目录下的krl-web-*.jar文件
-        # 2. 排除.jar.original文件（Maven打包生成的原始JAR）
-        # 3. 取第一个匹配的文件
-
-        # 如果未找到JAR文件，则报错退出
-
-        # 复制JAR文件到构建目录
-
-        # 使用jpackage工具打包应用镜像：如果不指定 --runtime-image，jpackage 会自动把当前编译环境（GitHub Actions 里的 JDK 21）打包塞进你的最终程序里。
-        # 即生成的软件里自带了一个完整的 JDK/JRE 文件夹。对于SpringBoot等复杂框架，不建议手动运行 jlink裁剪JRE。
-        # --type app-image: 生成应用镜像
-        # --name: 应用名称
-        # --app-version: 应用版本
-        # --input: 输入目录（包含JAR文件）
-        # --main-jar: 主JAR文件
-        # --main-class: 主类名
-        # --icon: 图标文件路径（根据操作系统不同）
-        # --add-modules: 添加所有模块路径,对于非模块化的 SpringBoot Fat Jar 通常不需要
-        # --vendor: 供应商名称
-
+        # 注意，`|` 是多行字符串的开始，用于定义多行命令。在`|`之后，不能以`#`添加注释，否则会报错。
         run: |
-          
           set -euo pipefail
+          # 设置bash执行选项：
+          # -e: 遇到错误立即退出
+          # -u: 引用未定义变量时退出
+          # -o pipefail: 管道命令中任何一个失败则整个命令失败
           
-          # --dest: 输出目录
+          
+          # 应用名称：KRLParser
           APP_NAME="KRLParser"
           
-
+          # 确定版本号：
+          # 如果是标签推送，则使用标签名（去掉v前缀）
+          # 否则使用开发版本号（dev-加上commit哈希的前7位）
           if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
             VERSION="${GITHUB_REF_NAME#v}"
           else
             VERSION="dev-${GITHUB_SHA::7}"
           fi
           
-
+          # 确定图标路径 (假设在根目录/icons)
           if [[ "${{ runner.os }}" == "Windows" ]]; then
-
+          # -ico: Windows图标文件格式
             ICON_PATH="icons/windowsIcon.ico"
           else
-
+          # -icns: macOS图标文件格式
             ICON_PATH="icons/macIcon.icns"
           fi
-
-
+          
+          # 清理并创建打包专用工作区
           rm -rf build
           mkdir -p build/input build/dist
-          
+               
+          # 查找打包好的Spring Boot JAR文件(install 后文件肯定在)：
+          # 1. 列出krl-web/target目录下的krl-web-*.jar文件
+          # 2. 排除.jar.original文件（Maven打包生成的原始JAR）
+          # 3. 取第一个匹配的文件
           JAR_PATH=$(ls krl-web/target/krl-web-*.jar | grep -v '\.jar\.original$' | head -n 1)
           
-
+          # 如果未找到JAR文件，则报错退出
           if [[ -z "$JAR_PATH" ]]; then
             echo "Packaged JAR not found in krl-web/target" >&2
             exit 1
           fi
           
-
+          # 复制JAR文件到构建目录
           cp "$JAR_PATH" build/input/app.jar
-
-
+          
+          # 使用jpackage工具打包应用镜像：如果不指定 --runtime-image，jpackage 会自动把当前编译环境（GitHub Actions 里的 JDK 21）打包塞进你的最终程序里。
+          # 即生成的软件里自带了一个完整的 JDK/JRE 文件夹。对于SpringBoot等复杂框架，不建议手动运行 jlink裁剪JRE。
+          # --type app-image: 生成应用镜像
+          # --name: 应用名称
+          # --app-version: 应用版本
+          # --input: 输入目录（包含JAR文件）
+          # --main-jar: 主JAR文件
+          # --main-class: 主类名
+          # --icon: 图标文件路径（根据操作系统不同）
+          # --add-modules: 添加所有模块路径,对于非模块化的 SpringBoot Fat Jar 通常不需要
+          # --vendor: 供应商名称
+          # --dest: 输出目录
           jpackage \
             --type app-image \
             --name "$APP_NAME" \
@@ -151,8 +129,11 @@ jobs:
             --icon "$ICON_PATH" \
             --vendor "WaitForU" \
             --dest build/dist
-
-
+          
+          # 根据操作系统打包成不同格式：
+          # Windows使用7z打包为ZIP文件
+          # macOS使用ditto打包为ZIP文件（保留.app结构）
+          # macOS 需要保持权限，使用 ditto 命令
           if [[ "${{ runner.os }}" == "Windows" ]]; then
             7z a "${APP_NAME}-${VERSION}-windows.zip" "build/dist/${APP_NAME}"
           else
@@ -160,10 +141,7 @@ jobs:
             ditto -c -k --sequesterRsrc --keepParent "build/dist/${APP_NAME}.app" "${APP_NAME}-${VERSION}-macos.zip"
           fi
 
-      # 根据操作系统打包成不同格式：
-      # Windows使用7z打包为ZIP文件
-      # macOS使用ditto打包为ZIP文件（保留.app结构）
-      # macOS 需要保持权限，使用 ditto 命令
+
 
       # 步骤5：上传构建工件
       - name: Upload artifact
