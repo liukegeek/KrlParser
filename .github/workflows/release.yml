@@ -59,6 +59,7 @@ jobs:
         # 使用bash shell执行命令
         shell: bash
 
+
         #
         # 设置bash执行选项：
         # -e: 遇到错误立即退出
@@ -100,12 +101,12 @@ jobs:
         # --icon: 图标文件路径（根据操作系统不同）
         # --add-modules: 添加所有模块路径,对于非模块化的 SpringBoot Fat Jar 通常不需要
         # --vendor: 供应商名称
-        # --dest: 输出目录
-        run: |
 
+        run: |
+          
           set -euo pipefail
           
-
+          # --dest: 输出目录
           APP_NAME="KRLParser"
           
 
