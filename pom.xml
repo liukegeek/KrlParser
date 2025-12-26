@@ -80,7 +80,7 @@
                     <artifactId>spring-boot-maven-plugin</artifactId>
                     <configuration>
                         <!-- 如果你有多个 @SpringBootApplication，显式指定主类；否则可省略 -->
-                        <mainClass>tech.waitforu.krlweb.KrlWebApplication</mainClass>
+<!--                        <mainClass>tech.waitforu.krlweb.KrlWebApplication</mainClass>-->
                         <layers enabled="true"/>
                     </configuration>
                     <executions>

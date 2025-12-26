@@ -114,7 +114,7 @@ jobs:
           # --app-version: 应用版本
           # --input: 输入目录（包含JAR文件）
           # --main-jar: 主JAR文件
-          # --main-class: 主类名
+          # --main-class: 主类名. 省略则可让 jpackage 自动从 Spring Boot 的 JAR 包里读取入口。
           # --icon: 图标文件路径（根据操作系统不同）
           # --add-modules: 添加所有模块路径,对于非模块化的 SpringBoot Fat Jar 通常不需要
           # --vendor: 供应商名称
@@ -125,7 +125,7 @@ jobs:
             --app-version "$VERSION" \
             --input build/input \
             --main-jar app.jar \
-            --main-class tech.waitforu.krlweb.KrlWebApplication \
+
             --icon "$ICON_PATH" \
             --vendor "WaitForU" \
             --dest build/dist
