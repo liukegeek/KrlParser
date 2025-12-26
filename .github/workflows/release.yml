@@ -59,7 +59,7 @@ jobs:
         # 使用bash shell执行命令
         shell: bash
         run: |
-          # 设置bash执行选项：
+        # 设置bash执行选项：
           # -e: 遇到错误立即退出
           # -u: 引用未定义变量时退出
           # -o pipefail: 管道命令中任何一个失败则整个命令失败
@@ -79,9 +79,11 @@ jobs:
           
           # 确定图标路径 (假设在根目录/icons)
           if [[ "${{ runner.os }}" == "Windows" ]]; then
-          ICON_PATH="icons/windowsIcon.ico"
+            # -ico: Windows图标文件格式
+            ICON_PATH="icons/windowsIcon.ico"
           else
-          ICON_PATH="icons/macIcon.icns"
+            # -icns: macOS图标文件格式
+            ICON_PATH="icons/macIcon.icns"
           fi
 
           # 清理并创建打包专用工作区
@@ -126,7 +128,6 @@ jobs:
             --main-jar app.jar \
             --main-class tech.waitforu.krlweb.KrlWebApplication \
             --icon "$ICON_PATH" \
-#            --add-modules ALL-MODULE-PATH \
             --vendor "WaitForU" \
             --dest build/dist
 
