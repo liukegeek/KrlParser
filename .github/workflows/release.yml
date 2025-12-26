@@ -58,7 +58,7 @@ jobs:
       - name: Package app image
         # 使用bash shell执行命令
         shell: bash
-        run:
+        run: |
           # 设置bash执行选项：
           # -e: 遇到错误立即退出
           # -u: 引用未定义变量时退出
