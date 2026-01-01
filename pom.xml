@@ -84,8 +84,8 @@
                         <layers enabled="true"/>
                     </configuration>
                     <executions>
-                        <!--增加 <goal>repackage</goal> → mvn package 就会自动产出 可执行 jar（而不是普通 jar）。-->
-                        <!--之后就能 java -jar target/xxx.jar 启动了（当然我们最终要用 jlink+jpackage 封装）。-->
+                        <!--增加 <goal>repackage</goal> → mvn package 就会自动产出 可执行 jar（FatJar，而不是普通 jar）。-->
+                        <!--之后就能 java -jar target/xxx.jar 启动了（当然我们最终要用 jpackage 封装）。-->
                         <execution>
                             <goals>
                                 <goal>repackage</goal>
