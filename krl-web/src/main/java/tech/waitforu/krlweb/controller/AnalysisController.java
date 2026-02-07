@@ -47,7 +47,7 @@ public class AnalysisController {
 
         try {
             //调用服务分析机器人调用图
-            return carCallAnalysisService.analyze(tempFile.toString(), tempConfigFile.toString());
+            return carCallAnalysisService.carInvocateAnalyze(tempFile.toString(), tempConfigFile.toString());
         } catch (IOException exception) {
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "解析失败", exception);
         } finally {

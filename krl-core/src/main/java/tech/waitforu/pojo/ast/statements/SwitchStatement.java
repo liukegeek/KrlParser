@@ -12,7 +12,7 @@ import java.util.List;
  * Version 1.0
  */
 public class SwitchStatement extends tech.waitforu.pojo.ast.statements.AbstractStatement implements Statement {
-    String switchExpression; //用于匹配比较的表达式
+    String switchExpression; //用于匹配比较的表达式,比如"Switch PGNO",其中PGNO即为这里的switchExpression。
 
     //case块的列表,注意krl.g4的语法规则中，由于case块不单独存在，故而未将case块设置为statement的一种语法规则。
     // Java代码中，为了方便，将case块设定为Statement的实现类了！

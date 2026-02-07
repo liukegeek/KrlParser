@@ -18,15 +18,26 @@ import java.io.Reader;
  * Version 1.0
  */
 public class YamlConfigLoad {
+    // yamlMapper用于通过readValue方法从一个`.yml`解析中对应的JAVA对象
     private final ObjectMapper yamlMapper;
+    // configFile 用于存储配置文件的路径
     private final File configFile;
 
+    /**
+     * 构造函数，初始化 YAML 配置加载器
+     * @param configPath 配置文件的路径
+     */
     public YamlConfigLoad(String configPath) {
         this.yamlMapper = new ObjectMapper(new YAMLFactory());
         this.configFile = new File(configPath);
     }
 
-    public Config loadConfig(Config defaultConfig) throws IOException {
+    /**
+     * 加载配置文件
+     * @return 解析后的 Config 对象
+     * @throws IOException 如果读取配置文件时发生 I/O 错误
+     */
+    public Config loadConfig() throws IOException {
         if (!configFile.exists()) {
             // 找不到外部配置，使用resources中的默认配置"config.yml",
             InputStream configStream = getClass().getClassLoader().getResourceAsStream("config.yml");

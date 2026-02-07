@@ -1,6 +1,5 @@
 package tech.waitforu.service;
 
-import org.ini4j.Ini;
 import tech.waitforu.loader.KrlZipLoader;
 import tech.waitforu.loader.YamlConfigLoad;
 import tech.waitforu.parser.CarCallReferenceAnalyze;
@@ -9,12 +8,9 @@ import tech.waitforu.parser.ModuleRepository;
 import tech.waitforu.pojo.carcallgraph.CallNode;
 import tech.waitforu.pojo.config.Config;
 import tech.waitforu.pojo.config.RobotInfoConfig;
-import tech.waitforu.pojo.config.StrRuleConfig;
 import tech.waitforu.pojo.krl.KrlFile;
 import tech.waitforu.pojo.krl.RobotInfo;
 import tech.waitforu.rule.IgnoreRuleByStr;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 
 import java.io.IOException;
 import java.util.List;
@@ -28,14 +24,12 @@ import java.util.List;
  * Version 1.0
  */
 public class CarCallAnalysisService {
-    public RobotInfo analyze(String zipFilePath, String configFilePath) throws IOException {
+    public RobotInfo carInvocateAnalyze(String zipFilePath, String configFilePath) throws IOException {
         YamlConfigLoad yamlConfigLoad = new YamlConfigLoad(configFilePath);
-        Config config = yamlConfigLoad.loadConfig(new Config());
-        IgnoreRuleByStr ignoreRuleByStr = new IgnoreRuleByStr(config.getFileLoadSection());
-
+        Config config = yamlConfigLoad.loadConfig();
 
         IgnoreRuleByStr fileLoadRule = new IgnoreRuleByStr(config.getFileLoadSection());
-        IgnoreRuleByStr invokerParseRule = new IgnoreRuleByStr(config.getInvokerParseSection());
+        IgnoreRuleByStr carInvokerParseRule = new IgnoreRuleByStr(config.getCarInvokerParseSection());
         RobotInfoConfig robotInfoConfig = config.getRobotInfo();
 
         KrlZipLoader krlZipLoader = new KrlZipLoader(zipFilePath, fileLoadRule);
@@ -44,7 +38,7 @@ public class CarCallAnalysisService {
         ModuleRepository moduleRepository = new ModuleRepository();
         moduleRepository.assembleFromFileList(krlFileList);
 
-        CarCallReferenceAnalyze carCallReferenceAnalyze = new CarCallReferenceAnalyze(moduleRepository, invokerParseRule);
+        CarCallReferenceAnalyze carCallReferenceAnalyze = new CarCallReferenceAnalyze(moduleRepository, carInvokerParseRule);
         CallNode callGraphRoot = carCallReferenceAnalyze.analyze();
 
 
@@ -65,5 +59,15 @@ public class CarCallAnalysisService {
                 List.of(iniParser.get("TechPacks", "TechPacks").split("\\|")),
                 callGraphRoot
         );
+    }
+
+    public List<RobotInfo> carInvocateAnalyzeBatch(List<String> zipFilePathList, String configFilePath) throws IOException {
+        return zipFilePathList.stream().map(zipFilePath -> {
+            try {
+                return carInvocateAnalyze(zipFilePath, configFilePath);
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }).toList();
     }
 }

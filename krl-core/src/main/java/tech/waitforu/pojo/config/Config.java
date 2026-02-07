@@ -9,31 +9,33 @@ package tech.waitforu.pojo.config;
  * Version 1.0
  */
 public class Config {
-    private tech.waitforu.pojo.config.StrRuleConfig fileLoadSection;
-    private tech.waitforu.pojo.config.StrRuleConfig invokerParseSection;
-    private tech.waitforu.pojo.config.RobotInfoConfig robotInfoConfig;
+    private StrRuleConfig fileLoadSection;
+    private StrRuleConfig carInvokerParseSection;
+    private RobotInfoConfig robotInfoConfig;
 
-    public tech.waitforu.pojo.config.StrRuleConfig getFileLoadSection() {
+    // 通过Jackson文件对config.yml进行解析时，依靠get、set方法进行属性的赋值和获取。
+
+    public StrRuleConfig getFileLoadSection() {
         return fileLoadSection;
     }
 
-    public void setFileLoadSection(tech.waitforu.pojo.config.StrRuleConfig fileLoadSection) {
+    public void setFileLoadSection(StrRuleConfig fileLoadSection) {
         this.fileLoadSection = fileLoadSection;
     }
 
-    public tech.waitforu.pojo.config.StrRuleConfig getInvokerParseSection() {
-        return invokerParseSection;
+    public StrRuleConfig getCarInvokerParseSection() {
+        return carInvokerParseSection;
     }
 
-    public void setInvokerParseSection(tech.waitforu.pojo.config.StrRuleConfig invokerParseSection) {
-        this.invokerParseSection = invokerParseSection;
+    public void setCarInvokerParseSection(StrRuleConfig carInvokerParseSection) {
+        this.carInvokerParseSection = carInvokerParseSection;
     }
 
-    public tech.waitforu.pojo.config.RobotInfoConfig getRobotInfo() {
+    public RobotInfoConfig getRobotInfo() {
         return robotInfoConfig;
     }
 
-    public void setRobotInfo(tech.waitforu.pojo.config.RobotInfoConfig robotInfoConfig) {
+    public void setRobotInfo(RobotInfoConfig robotInfoConfig) {
         this.robotInfoConfig = robotInfoConfig;
     }
 }

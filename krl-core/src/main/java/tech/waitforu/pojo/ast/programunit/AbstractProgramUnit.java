@@ -97,7 +97,7 @@ public abstract class AbstractProgramUnit extends AbstractAstNode implements Pro
     public List<Statement> getStatementList(StatementType statementType) {
         List<Statement> statementList = new ArrayList<>();
         for (Statement statement : statementsList) {
-            if (statement.getStatementType() == statementType) {
+            if (statement != null && statement.getStatementType() == statementType) {
                 statementList.add(statement);
             }
         }

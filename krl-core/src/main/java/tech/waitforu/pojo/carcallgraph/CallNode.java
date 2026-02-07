@@ -13,7 +13,7 @@ import java.util.Map;
  * Create: 2025/12/17 16:26
  * Version 1.0
  */
-public class CallNode implements tech.waitforu.pojo.carcallgraph.CarReferenceNode {
+public class CallNode implements CarReferenceNode {
     private String id; //结点唯一标识符（用于引用）
     private String value; // 节点值（cell、P11、SA3H622、SA3H_WELD等）
     private tech.waitforu.pojo.carcallgraph.NodeType nodeType; // 节点类型（机器人、cell程序、P程序、车型程序、轨迹程序等）

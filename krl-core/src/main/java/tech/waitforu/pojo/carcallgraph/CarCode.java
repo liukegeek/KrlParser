@@ -8,7 +8,7 @@ package tech.waitforu.pojo.carcallgraph;
  * Create: 2025/12/18 11:06
  * Version 1.0
  */
-public class CarCode extends tech.waitforu.pojo.carcallgraph.CallNode {
+public class CarCode extends CallNode {
     private final int majorIndexOfCar;
     private final int minorIndexOfCar;
 
