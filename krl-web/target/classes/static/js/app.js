@@ -17,11 +17,14 @@ try {
 
 // 全局状态
 let cy = null;
-let currentView = 'car'; // 'line' | 'car'
-let parsedData = null; // 存储解析后的 RobotInfo
+let currentView = 'line'; // 'line' | 'car'
+let parsedRobots = []; // 存储解析后的 RobotInfo 列表
+let selectedRobotIndex = 0;
 let uploadState = {
-    zipFile: null,
-    configFile: null
+    zipFiles: [],
+    configPath: '',
+    configContent: '',
+    configLoaded: false
 };
 
 // DOM 元素引用
@@ -37,9 +40,14 @@ const dom = {
     btnCarView: document.getElementById('btnCarView'),
     loader: document.getElementById('loader'),
     fileUploadButton: document.getElementById('fileUploadButton'),
-    configUploadButton: document.getElementById('configUploadButton'),
     fileUploadText: document.getElementById('fileUploadText'),
-    configUploadText: document.getElementById('configUploadText'),
+    configButton: document.getElementById('configButton'),
+    configModal: document.getElementById('configModal'),
+    configCloseBtn: document.getElementById('configCloseBtn'),
+    configReloadBtn: document.getElementById('configReloadBtn'),
+    configApplyBtn: document.getElementById('configApplyBtn'),
+    configTextarea: document.getElementById('configTextarea'),
+    configPathText: document.getElementById('configPathText'),
     startAnalysisBtn: document.getElementById('startAnalysisBtn'),
     nodePopover: document.getElementById('nodePopover'),
     nodeControlPanel: document.getElementById('nodeControlPanel'),
@@ -69,6 +77,16 @@ const activeTypeSelections = new Set();
 let popoverDragState = null;
 let lastNodeDoubleClickAt = 0;
 let tapTimer = null;
+
+function getSelectedRobot() {
+    if (!Array.isArray(parsedRobots) || parsedRobots.length === 0) {
+        return null;
+    }
+    if (selectedRobotIndex < 0 || selectedRobotIndex >= parsedRobots.length) {
+        selectedRobotIndex = 0;
+    }
+    return parsedRobots[selectedRobotIndex];
+}
 
 function hideNodePopover() {
     if (dom.nodePopover) {
@@ -345,7 +363,13 @@ function initCy(elements, layoutName = 'dagre') {
         tapTimer = setTimeout(() => {
             // 如果是在线体视图，点击进入车型视图
             if (currentView === 'line') {
+                const nextRobotIndex = Number.parseInt(node.data('robotIndex'), 10);
+                if (Number.isInteger(nextRobotIndex) && nextRobotIndex >= 0) {
+                    selectedRobotIndex = nextRobotIndex;
+                }
                 switchView('car');
+                tapTimer = null;
+                return;
             }
 
             // 清除之前的状态
@@ -444,7 +468,7 @@ function switchView(viewName) {
         dom.btnLineView.classList.remove('bg-blue-600', 'text-white', 'shadow-md');
         dom.btnLineView.classList.add('text-slate-500', 'hover:bg-slate-100');
 
-        if (parsedData) {
+        if (parsedRobots.length > 0) {
             toggleSidebar(false);
             dom.sidebarTrigger.classList.remove('hidden');
         }
@@ -462,31 +486,36 @@ function switchView(viewName) {
 // -------------------------------------------------------------------------
 
 function renderLineGraph() {
-    if (!parsedData) return;
+    if (parsedRobots.length === 0) {
+        initCy([], 'grid');
+        return;
+    }
 
-    // 构建线体视图数据：目前只有一个机器人节点
-    const elements = [
-        {
-            data: {
-                id: 'robot_root',
-                label: parsedData.robotName || 'Unknown Robot',
-                type: 'ROBOT_ROOT'
-            }
+    const elements = parsedRobots.map((robot, index) => ({
+        data: {
+            id: `robot_root_${index}`,
+            label: robot.robotName || robot.archiveName || `Robot ${index + 1}`,
+            type: 'ROBOT_ROOT',
+            robotIndex: index
         }
-    ];
+    }));
 
     initCy(elements, 'grid');
 }
 
 function renderCarGraph() {
-    if (!parsedData) return;
+    const selectedRobot = getSelectedRobot();
+    if (!selectedRobot) {
+        initCy([], 'dagre');
+        return;
+    }
 
     // 转换 RobotInfo 为 Cytoscape Elements
     const elements = [];
     const nodes = new Set();
 
     // 1. 添加节点
-    parsedData.modules.forEach(mod => {
+    selectedRobot.modules.forEach(mod => {
         const nodeId = mod.name || mod.id;
         if (!nodeId || nodes.has(nodeId)) {
             return;
@@ -506,7 +535,7 @@ function renderCarGraph() {
     });
 
     // 2. 添加边 (调用关系)
-    parsedData.calls.forEach((call, index) => {
+    selectedRobot.calls.forEach((call, index) => {
         if (!nodes.has(call.from)) {
             elements.push({data: {id: call.from, label: call.from, type: 'SRC'}});
             nodes.add(call.from);
@@ -518,7 +547,7 @@ function renderCarGraph() {
 
         elements.push({
             data: {
-                id: `e${index}`,
+                id: `e${selectedRobotIndex}_${index}`,
                 source: call.from,
                 target: call.to
             }
@@ -528,7 +557,7 @@ function renderCarGraph() {
     initCy(elements, 'dagre');
     applyAllNodeTypeScales();
     applyTypeHighlights();
-    updateSidebar(parsedData);
+    updateSidebar(selectedRobot);
 }
 
 // -------------------------------------------------------------------------
@@ -663,6 +692,14 @@ function normalizeRobotInfo(raw) {
     };
 }
 
+function normalizeRobotInfoList(raw) {
+    if (Array.isArray(raw)) {
+        return raw.map(item => normalizeRobotInfo(item)).filter(Boolean);
+    }
+    const singleRobot = normalizeRobotInfo(raw);
+    return singleRobot ? [singleRobot] : [];
+}
+
 // -------------------------------------------------------------------------
 // UI 辅助功能
 // -------------------------------------------------------------------------
@@ -681,6 +718,14 @@ function toggleSidebar(forceState) {
 }
 
 function updateSidebar(data) {
+    if (!data) {
+        dom.metaName.textContent = '--';
+        dom.metaVersion.textContent = '--';
+        dom.metaDate.textContent = '--';
+        dom.techPackList.innerHTML = '<div class="text-sm text-slate-400 italic">暂无数据</div>';
+        return;
+    }
+
     dom.metaName.textContent = data.robotName || '--';
     dom.metaVersion.textContent = data.version || '--';
     dom.metaDate.textContent = data.archiveDate || '--';
@@ -848,19 +893,121 @@ initNodeControlPanel();
 // 上传处理
 // -------------------------------------------------------------------------
 
+const zipInput = document.getElementById('fileUpload');
+
+function updateStartButtonState() {
+    if (uploadState.zipFiles.length > 0 && uploadState.configLoaded) {
+        dom.startAnalysisBtn.disabled = false;
+        dom.startAnalysisBtn.classList.remove('action-disabled');
+    } else {
+        dom.startAnalysisBtn.disabled = true;
+        dom.startAnalysisBtn.classList.add('action-disabled');
+    }
+}
+
+function formatZipLabel(files, defaultLabel) {
+    if (!Array.isArray(files) || files.length === 0) {
+        return defaultLabel;
+    }
+    if (files.length <= 2) {
+        return `${defaultLabel}: ${files.map(file => file.name).join(', ')}`;
+    }
+    return `${defaultLabel}: 已选择 ${files.length} 个文件`;
+}
+
+function isAllowedExtension(file, allowedExtensions) {
+    const extension = file.name.split('.').pop()?.toLowerCase();
+    if (!extension) {
+        return false;
+    }
+    return allowedExtensions.includes(extension);
+}
+
+function resetInputFile(input, labelElement, defaultLabel, targetField) {
+    input.value = '';
+    labelElement.textContent = defaultLabel;
+    uploadState[targetField] = [];
+}
+
+async function extractErrorMessage(response) {
+    let payloadText = '';
+    try {
+        payloadText = await response.text();
+    } catch (error) {
+        console.warn('读取错误响应失败', error);
+    }
+    if (!payloadText) {
+        return `HTTP ${response.status}`;
+    }
+    try {
+        const payload = JSON.parse(payloadText);
+        if (payload && payload.message) {
+            return payload.message;
+        }
+    } catch (_) {
+        // ignored
+    }
+    return payloadText;
+}
+
+function setConfigEditorContent(content) {
+    const safeContent = typeof content === 'string' ? content : '';
+    uploadState.configContent = safeContent;
+    if (dom.configTextarea) {
+        dom.configTextarea.value = safeContent;
+    }
+}
+
+async function loadConfigFromServer() {
+    const response = await fetch('/api/config');
+    if (!response.ok) {
+        const message = await extractErrorMessage(response);
+        throw new Error(`读取配置失败: ${message}`);
+    }
+    const payload = await response.json();
+    uploadState.configPath = payload.configPath || '';
+    uploadState.configLoaded = true;
+    setConfigEditorContent(payload.content || '');
+    if (dom.configPathText) {
+        dom.configPathText.textContent = uploadState.configPath || '--';
+    }
+    updateStartButtonState();
+}
+
+function openConfigModal() {
+    if (!dom.configModal) {
+        return;
+    }
+    if (dom.configTextarea) {
+        dom.configTextarea.value = uploadState.configContent || '';
+    }
+    dom.configModal.classList.remove('hidden');
+    dom.configModal.classList.add('flex');
+}
+
+function closeConfigModal() {
+    if (!dom.configModal) {
+        return;
+    }
+    dom.configModal.classList.add('hidden');
+    dom.configModal.classList.remove('flex');
+}
+
 async function uploadAnalysis() {
-    if (!uploadState.zipFile) {
+    if (uploadState.zipFiles.length === 0) {
         alert('请先上传备份文件');
         return;
     }
-    if (!uploadState.configFile) {
-        alert('请先上传配置文件');
+    if (!uploadState.configLoaded) {
+        alert('配置尚未加载完成，请稍后重试');
         return;
     }
 
     const formData = new FormData();
-    formData.append('file', uploadState.zipFile);
-    formData.append('config', uploadState.configFile);
+    uploadState.zipFiles.forEach((zipFile) => {
+        formData.append('files', zipFile);
+    });
+    formData.append('configText', uploadState.configContent || '');
 
     dom.loader.classList.remove('hidden');
     dom.loader.classList.add('flex');
@@ -872,17 +1019,17 @@ async function uploadAnalysis() {
         });
 
         if (!response.ok) {
-            const errorText = await response.text();
-            const message = errorText ? `解析失败: ${errorText}` : `解析失败: ${response.status}`;
-            throw new Error(message);
+            const message = await extractErrorMessage(response);
+            throw new Error(`解析失败: ${message}`);
         }
 
         const rawData = await response.json();
-        parsedData = normalizeRobotInfo(rawData);
-        if (!parsedData) {
+        parsedRobots = normalizeRobotInfoList(rawData);
+        if (parsedRobots.length === 0) {
             throw new Error('解析失败: 返回数据格式不正确');
         }
-        switchView('car');
+        selectedRobotIndex = 0;
+        switchView('line');
     } catch (error) {
         console.error(error);
         alert(error.message || '解析失败，请检查后端日志或接口返回。');
@@ -892,82 +1039,76 @@ async function uploadAnalysis() {
     }
 }
 
-// 监听上传
-const zipInput = document.getElementById('fileUpload');
-const configInput = document.getElementById('configUpload');
-
-function updateStartButtonState() {
-    if (uploadState.zipFile && uploadState.configFile) {
-        dom.startAnalysisBtn.disabled = false;
-        dom.startAnalysisBtn.classList.remove('action-disabled');
-    } else {
-        dom.startAnalysisBtn.disabled = true;
-        dom.startAnalysisBtn.classList.add('action-disabled');
-    }
-}
-
-function formatFileLabel(file, defaultLabel) {
-    if (!file) {
-        return defaultLabel;
-    }
-    return `${defaultLabel}: ${file.name}`;
-}
-
-function isAllowedExtension(file, allowedExtensions) {
-    const extension = file.name.split('.').pop()?.toLowerCase();
-    if (!extension) {
-        return false;
-    }
-    return allowedExtensions.includes(extension);
-}
-
-function resetInputFile(input, labelElement, defaultLabel) {
-    input.value = '';
-    labelElement.textContent = defaultLabel;
-}
-
 dom.fileUploadButton.addEventListener('click', () => {
     zipInput.click();
 });
 
-dom.configUploadButton.addEventListener('click', () => {
-    configInput.click();
-});
-
 zipInput.addEventListener('change', (e) => {
-    const file = e.target.files[0] || null;
-    if (file && !isAllowedExtension(file, ['zip'])) {
+    const files = Array.from(e.target.files || []);
+    const invalidFile = files.find(file => !isAllowedExtension(file, ['zip']));
+    if (invalidFile) {
         alert('请选择 .zip 格式的备份文件');
-        resetInputFile(zipInput, dom.fileUploadText, '上传备份 (.zip)');
-        uploadState.zipFile = null;
+        resetInputFile(zipInput, dom.fileUploadText, '上传备份 (.zip)', 'zipFiles');
         updateStartButtonState();
         return;
     }
 
-    uploadState.zipFile = file;
-    dom.fileUploadText.textContent = formatFileLabel(uploadState.zipFile, '上传备份 (.zip)');
+    uploadState.zipFiles = files;
+    dom.fileUploadText.textContent = formatZipLabel(uploadState.zipFiles, '上传备份 (.zip)');
     updateStartButtonState();
 });
 
-configInput.addEventListener('change', (e) => {
-    const file = e.target.files[0] || null;
-    if (file && !isAllowedExtension(file, ['json', 'yml', 'yaml'])) {
-        alert('配置文件仅支持 .json/.yml/.yaml');
-        resetInputFile(configInput, dom.configUploadText, '上传配置');
-        uploadState.configFile = null;
-        updateStartButtonState();
-        return;
-    }
+if (dom.configButton) {
+    dom.configButton.addEventListener('click', () => {
+        openConfigModal();
+    });
+}
 
-    uploadState.configFile = file;
-    dom.configUploadText.textContent = formatFileLabel(uploadState.configFile, '上传配置');
-    updateStartButtonState();
-});
+if (dom.configCloseBtn) {
+    dom.configCloseBtn.addEventListener('click', () => {
+        closeConfigModal();
+    });
+}
+
+if (dom.configModal) {
+    dom.configModal.addEventListener('click', (event) => {
+        if (event.target === dom.configModal) {
+            closeConfigModal();
+        }
+    });
+}
+
+if (dom.configApplyBtn) {
+    dom.configApplyBtn.addEventListener('click', () => {
+        setConfigEditorContent(dom.configTextarea ? dom.configTextarea.value : '');
+        closeConfigModal();
+    });
+}
+
+if (dom.configReloadBtn) {
+    dom.configReloadBtn.addEventListener('click', async () => {
+        try {
+            await loadConfigFromServer();
+            alert('已从磁盘重载配置。');
+        } catch (error) {
+            console.error(error);
+            alert(error.message || '重载配置失败');
+        }
+    });
+}
 
 dom.startAnalysisBtn.addEventListener('click', () => {
     if (dom.startAnalysisBtn.disabled) {
-        alert('请先上传备份和配置文件');
+        alert('请先上传备份文件');
         return;
     }
     uploadAnalysis();
+});
+
+switchView('line');
+loadConfigFromServer().catch((error) => {
+    console.error(error);
+    uploadState.configLoaded = false;
+    updateStartButtonState();
+    alert(error.message || '初始化配置失败，请检查后端日志。');
 });

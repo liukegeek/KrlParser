@@ -153,7 +153,7 @@ public class CarCallReferenceAnalyze {
         if (existingNodes.containsKey(id) && existingNodes.get(id) instanceof CallNode) {
             // 如果节点已存在，为体现KRL中模块名字唯一的思想，直接赋值已存在的节点。
             // 注意，因为车型号(CarCodeNode)依赖于cell中不同case所传入的标签变量majorIndexOfCar，此时不一定遍历完cell中的所有case，该模块的车型号仍可能变动，故而不能像cell、carProgram节点一样直接return。
-             pProgramNode = (CallNode) existingNodes.get(id);
+            pProgramNode = (CallNode) existingNodes.get(id);
         } else {
             pProgramNode = new CallNode(id, nodeValue, nodeType, null);
             //设置结点的补充信息,关于模块文件的。
@@ -168,110 +168,111 @@ public class CarCallReferenceAnalyze {
                 .toList().getFirst();
 
         List<Variable> variableList = callProgramUnit.findNodesByType(Variable.class);
-        for (int i = 0; i < variableList.size(); i++) {
-            if (variableList.get(i).getVariableName().equalsIgnoreCase("GIPGNO2")) {
-                break;
-            }
-
-            //如果遍历完所有变量都没有找到"GIPGNO2"变量，即该模块不是P程序，直接按照车型程序解析。
-            if (i == variableList.size() - 1) {
-                // 由于没有P程序，故而原来P程序的结点类型设置为VIRTUAL。
-                pProgramNode.setNodeType(NodeType.VIRTUAL);
-
-                CallNode carCodeNode = parseCarCode(majorIndexOfCar, 0);
-
-                //将carCodeNode的相关信息就直接设置为carCode的值，比如622、105、1202。
-                carCodeNode.setRelevantInfo(carCodeNode.getValue());
-
-                // 此时车型程序就是当前调用的程序单元。
-                KrlModule carProgramModule = pProgramModule;
-                String carProgramName = callableName;
-                //解析出车型程序的结点。
-                CallNode carProgramNode = parseCarProgram(carProgramModule, carProgramName);
-                //将车型程序的相关信息设置为车型程序的名称。
-                carProgramNode.setRelevantInfo("无P程序，车型调用位于cell中");
-
-                //将车型程序连接在车型码下面。将车型码连接在P程序的下面。
-                if (!carCodeNode.getChildren().contains(carProgramNode)) {
-                    // 如果车型码节点中不存在车型程序节点，将车型程序节点添加到车型码节点中。
-                    carCodeNode.addChild(carProgramNode);
-                }
-                if (!pProgramNode.getChildren().contains(carCodeNode)) {
-                    // 如果P程序中不存在车型码节点，将车型码节点添加到P程序中。
-                    pProgramNode.addChild(carCodeNode);
-                }
-
-                existingNodes.put(id, pProgramNode);
-                return pProgramNode;
-            }
-        }
-
-
-        List<Statement> statementList = callProgramUnit.getStatementList(StatementType.SWITCH);
-        SwitchStatement switchStatement = null;
-        for (Statement statement : statementList) {
-            // 遍历所有SWITCH语句，找到第一个表达式为"GIPGNO2"的SWITCH语句。
-            if (((SwitchStatement) statement).getSwitchExpression().equalsIgnoreCase("GIPGNO2")) {
-                switchStatement = (SwitchStatement) statement;
+        //用于判断是该程序是P程序，还是直接调用的车型程序！
+        boolean isPProgram = false;
+        for (Variable variable : variableList) {
+            if (variable.getVariableName().equalsIgnoreCase("GIPGNO2")) {
+                isPProgram = true;
                 break;
             }
         }
-        // 判断是否存在SWITCH语句，且其匹配表达式为"GIPGNO2"
-        if (switchStatement == null) {
-            throw new RuntimeException("解析出错，" + pProgramModule.getModuleName() + "模块中未找到用于匹配`GIPGNO2`变量的SWITCH语句");
-        }
+        //如果遍历完所有变量都没有找到"GIPGNO2"变量，即该模块不是P程序，直接按照车型程序解析。
+        if (!isPProgram) {
+            //是车型程序
+            // 由于没有P程序，故而原来P程序的结点类型设置为VIRTUAL。
+            pProgramNode.setNodeType(NodeType.VIRTUAL);
 
-        List<CaseBlock> caseBlockList = switchStatement.getCaseBlocks();
-        caseBlockList.forEach(
-                caseBlock ->
-                {
-                    List<String> caseLabel = caseBlock.getCaseLabel();
-                    List<Statement> childStatementList = caseBlock.getChildStatement(StatementType.EXPRESSION);
-                    childStatementList.forEach(
-                            childStatement ->
-                            {
-                                if (!(childStatement instanceof ExpressionStatement expressionStatement)) {
-                                    throw new RuntimeException("解析出错，" + pProgramModule.getModuleName() + "模块中的CASE块中未找到表达式语句");
-                                }
-                                Expression expression = expressionStatement.getExpression();
-                                if (expression instanceof Invocation invocation) {
-                                    String targetName = invocation.getTargetName();
-                                    ProgramUnitType targetType = invocation.getTargetType();
+            CallNode carCodeNode = parseCarCode(majorIndexOfCar, 0);
 
-                                    if (!invokerParseRule.isIgnore(targetName)) {
-                                        //如果一个case对应多个标签，name会被解析为多个结点。
-                                        caseLabel.forEach(
-                                                label ->
-                                                {
-                                                    int minorIndexOfCar = Integer.parseInt(label);
+            //将carCodeNode的相关信息就直接设置为carCode的值，比如622、105、1202。
+            carCodeNode.setRelevantInfo(carCodeNode.getValue());
 
-                                                    CallNode carCodeNode = parseCarCode(majorIndexOfCar, minorIndexOfCar);
-                                                    //将carCodeNode的相关信息就直接设置为carCode的值，比如622、105、1202。
-                                                    carCodeNode.setRelevantInfo(carCodeNode.getValue());
+            // 此时车型程序就是当前调用的程序单元。
+            KrlModule carProgramModule = pProgramModule;
+            String carProgramName = callableName;
+            //解析出车型程序的结点。
+            CallNode carProgramNode = parseCarProgram(carProgramModule, carProgramName);
+            //将车型程序的相关信息设置为车型程序的名称。
+            carProgramNode.setRelevantInfo("无P程序，车型调用位于cell中");
 
-                                                    KrlModule module = moduleRepository.findByCallableName(targetName);
+            //将车型程序连接在车型码下面。将车型码连接在P程序的下面。
+            if (!carCodeNode.getChildren().contains(carProgramNode)) {
+                // 如果车型码节点中不存在车型程序节点，将车型程序节点添加到车型码节点中。
+                carCodeNode.addChild(carProgramNode);
+            }
+            if (!pProgramNode.getChildren().contains(carCodeNode)) {
+                // 如果P程序中不存在车型码节点，将车型码节点添加到P程序中。
+                pProgramNode.addChild(carCodeNode);
+            }
 
-                                                    //解析出车型程序的结点。
-                                                    CallNode carProgramNode = parseCarProgram(module, targetName);
-                                                    carProgramNode.setRelevantInfo(caseBlock.getTextContent());
+        } else {
+            //是P程序
+            List<Statement> statementList = callProgramUnit.getStatementList(StatementType.SWITCH);
+            SwitchStatement switchStatement = null;
+            for (Statement statement : statementList) {
+                // 遍历所有SWITCH语句，找到第一个表达式为"GIPGNO2"的SWITCH语句。
+                if (((SwitchStatement) statement).getSwitchExpression().equalsIgnoreCase("GIPGNO2")) {
+                    switchStatement = (SwitchStatement) statement;
+                    break;
+                }
+            }
+            // 判断是否存在SWITCH语句，且其匹配表达式为"GIPGNO2"
+            if (switchStatement == null) {
+                throw new RuntimeException("解析出错，" + pProgramModule.getModuleName() + "模块中未找到用于匹配`GIPGNO2`变量的SWITCH语句");
+            }
 
-                                                    //将车型程序连接在车型码下面。将车型码连接在P程序的下面。
-                                                    if (!carCodeNode.getChildren().contains(carProgramNode)) {
-                                                        // 如果车型码节点中不存在车型程序节点，将车型程序节点添加到车型码节点中。
-                                                        carCodeNode.addChild(carProgramNode);
+            List<CaseBlock> caseBlockList = switchStatement.getCaseBlocks();
+            caseBlockList.forEach(
+                    caseBlock ->
+                    {
+                        List<String> caseLabel = caseBlock.getCaseLabel();
+                        List<Statement> childStatementList = caseBlock.getChildStatement(StatementType.EXPRESSION);
+                        childStatementList.forEach(
+                                childStatement ->
+                                {
+                                    if (!(childStatement instanceof ExpressionStatement expressionStatement)) {
+                                        throw new RuntimeException("解析出错，" + pProgramModule.getModuleName() + "模块中的CASE块中未找到表达式语句");
+                                    }
+                                    Expression expression = expressionStatement.getExpression();
+                                    if (expression instanceof Invocation invocation) {
+                                        String targetName = invocation.getTargetName();
+                                        ProgramUnitType targetType = invocation.getTargetType();
+
+                                        if (!invokerParseRule.isIgnore(targetName)) {
+                                            //如果一个case对应多个标签，name会被解析为多个结点。
+                                            caseLabel.forEach(
+                                                    label ->
+                                                    {
+                                                        int minorIndexOfCar = Integer.parseInt(label);
+
+                                                        CallNode carCodeNode = parseCarCode(majorIndexOfCar, minorIndexOfCar);
+                                                        //将carCodeNode的相关信息就直接设置为carCode的值，比如622、105、1202。
+                                                        carCodeNode.setRelevantInfo(carCodeNode.getValue());
+
+                                                        KrlModule module = moduleRepository.findByCallableName(targetName);
+
+                                                        //解析出车型程序的结点。
+                                                        CallNode carProgramNode = parseCarProgram(module, targetName);
+                                                        carProgramNode.setRelevantInfo(caseBlock.getTextContent());
+
+                                                        //将车型程序连接在车型码下面。将车型码连接在P程序的下面。
+                                                        if (!carCodeNode.getChildren().contains(carProgramNode)) {
+                                                            // 如果车型码节点中不存在车型程序节点，将车型程序节点添加到车型码节点中。
+                                                            carCodeNode.addChild(carProgramNode);
+                                                        }
+                                                        if (!pProgramNode.getChildren().contains(carCodeNode)) {
+                                                            // 如果P程序中不存在车型码节点，将车型码节点添加到P程序中。
+                                                            pProgramNode.addChild(carCodeNode);
+                                                        }
                                                     }
-                                                    if (!pProgramNode.getChildren().contains(carCodeNode)) {
-                                                        // 如果P程序中不存在车型码节点，将车型码节点添加到P程序中。
-                                                        pProgramNode.addChild(carCodeNode);
-                                                    }
-                                                }
-                                        );
+                                            );
+                                        }
                                     }
                                 }
-                            }
-                    );
-                }
-        );
+                        );
+                    }
+            );
+        }
 
         existingNodes.put(id, pProgramNode);
         return pProgramNode;

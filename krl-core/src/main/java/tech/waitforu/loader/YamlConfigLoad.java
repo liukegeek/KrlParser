@@ -1,26 +1,20 @@
 package tech.waitforu.loader;
 
+import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import tech.waitforu.pojo.config.Config;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.Reader;
 
 /**
- * ClassName: loader.tech.waitforu.YamlConfigLoad
- * Package: tech.waitforu
- * Description: 用于加载 YAML 格式的配置文件
- * Author: LiuKe
- * Create: 2025/12/10 15:39
- * Version 1.0
+ * 加载 YAML 配置：优先读取外部路径，不存在时回退到 classpath 的 config.yml。
  */
 public class YamlConfigLoad {
-    // yamlMapper用于通过readValue方法从一个`.yml`解析中对应的JAVA对象
-    private final ObjectMapper yamlMapper;
-    // configFile 用于存储配置文件的路径
+    // 共享 YAML mapper，避免重复创建并保持解析行为一致
+    private static final ObjectMapper YAML_MAPPER = new ObjectMapper(new YAMLFactory());
+    // 外部配置文件路径
     private final File configFile;
 
     /**
@@ -28,7 +22,6 @@ public class YamlConfigLoad {
      * @param configPath 配置文件的路径
      */
     public YamlConfigLoad(String configPath) {
-        this.yamlMapper = new ObjectMapper(new YAMLFactory());
         this.configFile = new File(configPath);
     }
 
@@ -39,19 +32,24 @@ public class YamlConfigLoad {
      */
     public Config loadConfig() throws IOException {
         if (!configFile.exists()) {
-            // 找不到外部配置，使用resources中的默认配置"config.yml",
-            InputStream configStream = getClass().getClassLoader().getResourceAsStream("config.yml");
-            return yamlMapper.readValue(configStream,Config.class);
+            // 外部配置不存在时回退到 resources/config.yml
+            try (InputStream configStream = getClass().getClassLoader().getResourceAsStream("config.yml")) {
+                if (configStream == null) {
+                    throw new IOException("未找到默认配置文件 config.yml");
+                }
+                return YAML_MAPPER.readValue(configStream, Config.class);
+            }
         }
-        return yamlMapper.readValue(configFile, Config.class);
+        return YAML_MAPPER.readValue(configFile, Config.class);
     }
 
-    public void saveConfig(Config config) throws IOException {
-        // 确保目录存在
-        File parent = configFile.getParentFile();
-        if (parent != null && !parent.exists()) {
-            parent.mkdirs();
+    /**
+     * 将 YAML 文本解析为配置对象。
+     */
+    public static Config parseConfig(String yamlContent) throws IOException {
+        if (yamlContent == null || yamlContent.isBlank()) {
+            throw new IOException("配置内容为空");
         }
-        yamlMapper.writeValue(configFile, config);
+        return YAML_MAPPER.readValue(yamlContent, Config.class);
     }
 }

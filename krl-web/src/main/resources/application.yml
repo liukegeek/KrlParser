@@ -25,3 +25,7 @@ logging:
     root: INFO
     # 如果你想看更详细的 Spring 启动过程，可以设为 DEBUG
     org.springframework: INFO
+
+krl:
+  config:
+    path: ${user.home}/.KrlParser/Config.yml

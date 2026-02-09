@@ -13,6 +13,7 @@ import tech.waitforu.pojo.krl.RobotInfo;
 import tech.waitforu.rule.IgnoreRuleByStr;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -26,7 +27,13 @@ import java.util.List;
 public class CarCallAnalysisService {
     public RobotInfo carInvocateAnalyze(String zipFilePath, String configFilePath) throws IOException {
         YamlConfigLoad yamlConfigLoad = new YamlConfigLoad(configFilePath);
-        Config config = yamlConfigLoad.loadConfig();
+        return carInvocateAnalyze(zipFilePath, yamlConfigLoad.loadConfig());
+    }
+
+    public RobotInfo carInvocateAnalyze(String zipFilePath, Config config) throws IOException {
+        if (config == null) {
+            throw new IllegalArgumentException("配置不能为空");
+        }
 
         IgnoreRuleByStr fileLoadRule = new IgnoreRuleByStr(config.getFileLoadSection());
         IgnoreRuleByStr carInvokerParseRule = new IgnoreRuleByStr(config.getCarInvokerParseSection());
@@ -62,12 +69,18 @@ public class CarCallAnalysisService {
     }
 
     public List<RobotInfo> carInvocateAnalyzeBatch(List<String> zipFilePathList, String configFilePath) throws IOException {
-        return zipFilePathList.stream().map(zipFilePath -> {
-            try {
-                return carInvocateAnalyze(zipFilePath, configFilePath);
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
-        }).toList();
+        YamlConfigLoad yamlConfigLoad = new YamlConfigLoad(configFilePath);
+        return carInvocateAnalyzeBatch(zipFilePathList, yamlConfigLoad.loadConfig());
+    }
+
+    public List<RobotInfo> carInvocateAnalyzeBatch(List<String> zipFilePathList, Config config) throws IOException {
+        if (zipFilePathList == null || zipFilePathList.isEmpty()) {
+            return List.of();
+        }
+        List<RobotInfo> result = new ArrayList<>(zipFilePathList.size());
+        for (String zipFilePath : zipFilePathList) {
+            result.add(carInvocateAnalyze(zipFilePath, config));
+        }
+        return result;
     }
 }
