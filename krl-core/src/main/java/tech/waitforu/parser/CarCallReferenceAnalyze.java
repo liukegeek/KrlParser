@@ -13,7 +13,7 @@ import tech.waitforu.pojo.ast.AstNode;
 import tech.waitforu.pojo.ast.KrlRoot;
 import tech.waitforu.pojo.ast.expression.Expression;
 import tech.waitforu.pojo.ast.expression.Invocation;
-import tech.waitforu.pojo.ast.expression.Variable;
+import tech.waitforu.pojo.ast.expression.VariableExpression;
 import tech.waitforu.pojo.ast.programunit.ProgramUnit;
 import tech.waitforu.pojo.ast.programunit.ProgramUnitType;
 import tech.waitforu.pojo.carcallgraph.CallNode;
@@ -84,10 +84,12 @@ public class CarCallReferenceAnalyze {
 
         // 过滤出通过"PGNO"变量进行判断的SWITCH语句
         for (SwitchStatement statement : astNodeList) {
-            String switchExpression = statement.getSwitchExpression();
-            if (switchExpression.equalsIgnoreCase("PGNO") || switchExpression.equalsIgnoreCase("GIPGNO")) {
-                switchStatement = statement;
-                break;
+            if (statement.getSwitchExpression() instanceof VariableExpression variableExpression) {
+                String switchVariableName = variableExpression.getVariableName();
+                if (switchVariableName.equalsIgnoreCase("PGNO") || switchVariableName.equalsIgnoreCase("GIPGNO")) {
+                    switchStatement = statement;
+                    break;
+                }
             }
         }
         if (switchStatement == null) {
@@ -167,11 +169,11 @@ public class CarCallReferenceAnalyze {
                 .filter(programUnit -> programUnit.getName().equalsIgnoreCase(callableName))
                 .toList().getFirst();
 
-        List<Variable> variableList = callProgramUnit.findNodesByType(Variable.class);
+        List<VariableExpression> variableExpressionList = callProgramUnit.findNodesByType(VariableExpression.class);
         //用于判断是该程序是P程序，还是直接调用的车型程序！
         boolean isPProgram = false;
-        for (Variable variable : variableList) {
-            if (variable.getVariableName().equalsIgnoreCase("GIPGNO2")) {
+        for (VariableExpression variableExpression : variableExpressionList) {
+            if (variableExpression.getVariableName().equalsIgnoreCase("GIPGNO2")) {
                 isPProgram = true;
                 break;
             }
@@ -211,9 +213,12 @@ public class CarCallReferenceAnalyze {
             SwitchStatement switchStatement = null;
             for (Statement statement : statementList) {
                 // 遍历所有SWITCH语句，找到第一个表达式为"GIPGNO2"的SWITCH语句。
-                if (((SwitchStatement) statement).getSwitchExpression().equalsIgnoreCase("GIPGNO2")) {
-                    switchStatement = (SwitchStatement) statement;
-                    break;
+                if (((SwitchStatement) statement).getSwitchExpression() instanceof VariableExpression variableExpression) {
+                    String switchVariableName = variableExpression.getVariableName();
+                    if (switchVariableName.equalsIgnoreCase("GIPGNO2")) {
+                        switchStatement = (SwitchStatement) statement;
+                        break;
+                    }
                 }
             }
             // 判断是否存在SWITCH语句，且其匹配表达式为"GIPGNO2"

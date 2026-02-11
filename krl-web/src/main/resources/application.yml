@@ -9,12 +9,14 @@ spring:
     name: krl-web  # 对应spring.application.name
   servlet:
     multipart:
-      max-file-size: 100MB    # 单个文件最大大小
+      max-file-size: 1000MB    # 单个文件最大大小
       max-request-size: 1000MB # 单次请求最大大小（包含所有文件）
 
 logging:
+  # Boot logging defaults; custom logback-spring.xml can override file/rolling settings.
+  # logging.level.* still maps to runtime log levels.
   file:
-    # 设定日志存储的目录和文件名
+    # 设定默认日志存储的目录和文件名。当logback-spring.xml中未指定日志文件路径时，使用此配置。
     name: logs/krl-analysis.log
   logback:
     rollingpolicy:

@@ -9,8 +9,6 @@ package tech.waitforu.pojo.ast.expression;
  * Version 1.0
  */
 public enum ExpressionType {
-    //基本元素表达式
-    PRIMARY,
     // 逻辑非表达式
     NOT,
     // 正负号表达式
@@ -31,6 +29,10 @@ public enum ExpressionType {
     RELATION,
     // 赋值表达式
     ASSIGNMENT,
+
+
+    //   以下是基本表达式:
+
     // 括号表达式
     BRACKET,
     // 字面量表达式

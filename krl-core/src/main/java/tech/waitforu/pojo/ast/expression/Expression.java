@@ -12,5 +12,5 @@ import tech.waitforu.pojo.ast.AstNode;
  */
 public interface Expression extends AstNode {
     // 获取表达式类型
-    tech.waitforu.pojo.ast.expression.ExpressionType getExpressionType();
+    ExpressionType getExpressionType();
 }

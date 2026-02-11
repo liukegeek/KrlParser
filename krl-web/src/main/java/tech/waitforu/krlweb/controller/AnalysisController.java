@@ -2,6 +2,8 @@ package tech.waitforu.krlweb.controller;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpHeaders;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -10,11 +12,14 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 import tech.waitforu.krlweb.config.ConfigStorageService;
+import tech.waitforu.krlweb.service.CallGraphExcelExportService;
 import tech.waitforu.pojo.config.Config;
 import tech.waitforu.pojo.krl.RobotInfo;
 import tech.waitforu.service.CarCallAnalysisService;
 
 import java.io.IOException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -28,11 +33,14 @@ import java.util.List;
 public class AnalysisController {
     private final CarCallAnalysisService carCallAnalysisService;
     private final ConfigStorageService configStorageService;
+    private final CallGraphExcelExportService callGraphExcelExportService;
 
     public AnalysisController(CarCallAnalysisService carCallAnalysisService,
-                              ConfigStorageService configStorageService) {
+                              ConfigStorageService configStorageService,
+                              CallGraphExcelExportService callGraphExcelExportService) {
         this.carCallAnalysisService = carCallAnalysisService;
         this.configStorageService = configStorageService;
+        this.callGraphExcelExportService = callGraphExcelExportService;
     }
 
     @GetMapping("/config")
@@ -51,6 +59,41 @@ public class AnalysisController {
     public List<RobotInfo> analyze(@RequestPart(value = "files", required = false) List<MultipartFile> files,
                                    @RequestPart(value = "file", required = false) MultipartFile singleFile,
                                    @RequestPart(value = "configText", required = false) String configText) {
+        return executeAnalysis(files, singleFile, configText);
+    }
+
+    @PostMapping(value = "/analysis/excel", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<byte[]> analyzeAndExportExcel(
+            @RequestPart(value = "files", required = false) List<MultipartFile> files,
+            @RequestPart(value = "file", required = false) MultipartFile singleFile,
+            @RequestPart(value = "configText", required = false) String configText
+    ) {
+        List<RobotInfo> robotInfoList = executeAnalysis(files, singleFile, configText);
+        if (robotInfoList.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "未生成可导出的调用关系");
+        }
+
+        byte[] excelBytes;
+        try {
+            excelBytes = callGraphExcelExportService.export(robotInfoList);
+        } catch (IOException exception) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "生成Excel失败", exception);
+        }
+
+        String filename = "调用关系表.xlsx";
+        String encodedFilename = URLEncoder.encode(filename, StandardCharsets.UTF_8).replace("+", "%20");
+
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename*=UTF-8''" + encodedFilename)
+                .body(excelBytes);
+    }
+
+    private List<RobotInfo> executeAnalysis(
+            List<MultipartFile> files,
+            MultipartFile singleFile,
+            String configText
+    ) {
         List<MultipartFile> backupFiles = new ArrayList<>();
         if (files != null) {
             files.stream().filter(file -> file != null && !file.isEmpty()).forEach(backupFiles::add);

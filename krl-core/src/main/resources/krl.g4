@@ -115,7 +115,7 @@ enumValue
 //结构体类型的定义，比如：
 // GLOBAL STRUC SG_IOConfig_T INT Index, SG_IOBoolType_T Type, BOOL ErrorDefault
 structureDefinition
-    : GLOBAL? STRUC userType typeName  variableList (',' typeName variableList)*
+    : GLOBAL? STRUC userType typeName  variableExpressionList (',' typeName variableExpressionList)*
     ;
 
 //声明变量与信号，声明基本数据类型(INT REAL CHAR BOOL)时，DECL可以省略，且可以批量定义。
@@ -129,7 +129,7 @@ variableDeclaration
     ;
 
 //变量序列，比如 int x, y, dog, cat中的x, y, dog, cat
-variableList
+variableExpressionList
     : variableName (',' variableName)*
     ;
 // 变量，包括普通变量与数组变量

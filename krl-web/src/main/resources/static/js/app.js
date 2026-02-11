@@ -49,6 +49,7 @@ const dom = {
     configTextarea: document.getElementById('configTextarea'),
     configPathText: document.getElementById('configPathText'),
     startAnalysisBtn: document.getElementById('startAnalysisBtn'),
+    downloadExcelBtn: document.getElementById('downloadExcelBtn'),
     nodePopover: document.getElementById('nodePopover'),
     nodeControlPanel: document.getElementById('nodeControlPanel'),
     nodeControlTrigger: document.getElementById('nodeControlTrigger'),
@@ -896,12 +897,24 @@ initNodeControlPanel();
 const zipInput = document.getElementById('fileUpload');
 
 function updateStartButtonState() {
-    if (uploadState.zipFiles.length > 0 && uploadState.configLoaded) {
+    const canRun = uploadState.zipFiles.length > 0 && uploadState.configLoaded;
+    if (canRun) {
         dom.startAnalysisBtn.disabled = false;
         dom.startAnalysisBtn.classList.remove('action-disabled');
     } else {
         dom.startAnalysisBtn.disabled = true;
         dom.startAnalysisBtn.classList.add('action-disabled');
+    }
+
+    if (!dom.downloadExcelBtn) {
+        return;
+    }
+    if (canRun) {
+        dom.downloadExcelBtn.disabled = false;
+        dom.downloadExcelBtn.classList.remove('action-disabled');
+    } else {
+        dom.downloadExcelBtn.disabled = true;
+        dom.downloadExcelBtn.classList.add('action-disabled');
     }
 }
 
@@ -993,6 +1006,15 @@ function closeConfigModal() {
     dom.configModal.classList.remove('flex');
 }
 
+function buildAnalysisFormData() {
+    const formData = new FormData();
+    uploadState.zipFiles.forEach((zipFile) => {
+        formData.append('files', zipFile);
+    });
+    formData.append('configText', uploadState.configContent || '');
+    return formData;
+}
+
 async function uploadAnalysis() {
     if (uploadState.zipFiles.length === 0) {
         alert('请先上传备份文件');
@@ -1003,11 +1025,7 @@ async function uploadAnalysis() {
         return;
     }
 
-    const formData = new FormData();
-    uploadState.zipFiles.forEach((zipFile) => {
-        formData.append('files', zipFile);
-    });
-    formData.append('configText', uploadState.configContent || '');
+    const formData = buildAnalysisFormData();
 
     dom.loader.classList.remove('hidden');
     dom.loader.classList.add('flex');
@@ -1033,6 +1051,49 @@ async function uploadAnalysis() {
     } catch (error) {
         console.error(error);
         alert(error.message || '解析失败，请检查后端日志或接口返回。');
+    } finally {
+        dom.loader.classList.add('hidden');
+        dom.loader.classList.remove('flex');
+    }
+}
+
+async function downloadAnalysisExcel() {
+    if (uploadState.zipFiles.length === 0) {
+        alert('请先上传备份文件');
+        return;
+    }
+    if (!uploadState.configLoaded) {
+        alert('配置尚未加载完成，请稍后重试');
+        return;
+    }
+
+    const formData = buildAnalysisFormData();
+    dom.loader.classList.remove('hidden');
+    dom.loader.classList.add('flex');
+
+    try {
+        const response = await fetch('/api/analysis/excel', {
+            method: 'POST',
+            body: formData
+        });
+
+        if (!response.ok) {
+            const message = await extractErrorMessage(response);
+            throw new Error(`导出失败: ${message}`);
+        }
+
+        const blob = await response.blob();
+        const downloadUrl = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = downloadUrl;
+        link.download = '调用关系表.xlsx';
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(downloadUrl);
+    } catch (error) {
+        console.error(error);
+        alert(error.message || '导出Excel失败，请检查后端日志。');
     } finally {
         dom.loader.classList.add('hidden');
         dom.loader.classList.remove('flex');
@@ -1104,6 +1165,16 @@ dom.startAnalysisBtn.addEventListener('click', () => {
     }
     uploadAnalysis();
 });
+
+if (dom.downloadExcelBtn) {
+    dom.downloadExcelBtn.addEventListener('click', () => {
+        if (dom.downloadExcelBtn.disabled) {
+            alert('请先上传备份文件');
+            return;
+        }
+        downloadAnalysisExcel();
+    });
+}
 
 switchView('line');
 loadConfigFromServer().catch((error) => {

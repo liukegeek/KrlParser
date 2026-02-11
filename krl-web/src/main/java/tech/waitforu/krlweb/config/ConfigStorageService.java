@@ -46,20 +46,27 @@ public class ConfigStorageService {
      */
     public Config resolveConfig(String inlineConfigText) throws IOException {
         if (StringUtils.hasText(inlineConfigText)) {
+            // 如果请求内配置文本非空，直接解析返回。
             return YamlConfigLoad.parseConfig(inlineConfigText);
         }
+        // 如果请求内配置文本为空，从磁盘配置文件加载，解析并返回。
         return new YamlConfigLoad(configPath.toString()).loadConfig();
     }
 
+    /**
+     * 确保配置文件目录存在，若不存在则创建，同时从resources/config.yml中复制默认配置。
+     * @throws IOException 如果创建目录或复制默认配置文件时发生 I/O 错误
+     */
     private void ensureConfigFileExists() throws IOException {
         Path parent = configPath.getParent();
         if (parent != null) {
             Files.createDirectories(parent);
         }
         if (Files.exists(configPath)) {
+            // 如果配置文件已存在，直接返回。
             return;
         }
-        // 不存在时从 classpath 复制默认配置
+        // 不存在时从 classpath 复制默认配置文件。
         ClassPathResource defaultConfig = new ClassPathResource("config.yml");
         if (!defaultConfig.exists()) {
             throw new IOException("默认配置文件 config.yml 不存在");

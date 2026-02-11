@@ -1,5 +1,7 @@
 package tech.waitforu.pojo.ast.statements;
 
+import tech.waitforu.pojo.ast.expression.Expression;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -12,7 +14,7 @@ import java.util.List;
  * Version 1.0
  */
 public class SwitchStatement extends tech.waitforu.pojo.ast.statements.AbstractStatement implements Statement {
-    String switchExpression; //用于匹配比较的表达式,比如"Switch PGNO",其中PGNO即为这里的switchExpression。
+    Expression switchExpression; //用于匹配比较的表达式,比如"Switch PGNO",其中PGNO即为这里的switchExpression。
 
     //case块的列表,注意krl.g4的语法规则中，由于case块不单独存在，故而未将case块设置为statement的一种语法规则。
     // Java代码中，为了方便，将case块设定为Statement的实现类了！
@@ -22,6 +24,7 @@ public class SwitchStatement extends tech.waitforu.pojo.ast.statements.AbstractS
     private SwitchStatement(SwitchBuilder builder) {
         super(builder);
         this.switchExpression = builder.switchExpression;
+        this.addChild(switchExpression); //将switch表达式添加为子结点列表中
 
         this.caseBlocks = builder.caseBlocks;
         caseBlocks.forEach(this::addChild); //将case块添加为子结点列表中
@@ -34,7 +37,7 @@ public class SwitchStatement extends tech.waitforu.pojo.ast.statements.AbstractS
     }
 
     public static class SwitchBuilder extends StatementBuilder<SwitchBuilder> {
-        private String switchExpression;
+        private Expression switchExpression;
         private List<CaseBlock> caseBlocks = new ArrayList<>();
         private List<Statement> defaultstatementList = new ArrayList<>();
 
@@ -42,7 +45,7 @@ public class SwitchStatement extends tech.waitforu.pojo.ast.statements.AbstractS
             return this;
         }
 
-        public SwitchBuilder withSwitchExpression(String switchExpression) {
+        public SwitchBuilder withSwitchExpression(Expression switchExpression) {
             this.switchExpression = switchExpression;
             return self();
         }
@@ -63,7 +66,7 @@ public class SwitchStatement extends tech.waitforu.pojo.ast.statements.AbstractS
         }
     }
 
-    public String getSwitchExpression() {
+    public Expression getSwitchExpression() {
         return switchExpression;
     }
 
@@ -89,6 +92,7 @@ public class SwitchStatement extends tech.waitforu.pojo.ast.statements.AbstractS
         addChild(statement);
         return defaultStatementList.add(statement);
     }
+
      //删除指定索引的default语句
     public Statement removeDefaultStatement(int index) {
         //这里的移除需要验证是否可行。

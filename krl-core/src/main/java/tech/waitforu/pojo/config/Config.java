@@ -31,7 +31,7 @@ public class Config {
         this.carInvokerParseSection = carInvokerParseSection;
     }
 
-    public RobotInfoConfig getRobotInfo() {
+    public RobotInfoConfig getRobotInfoConfig() {
         return robotInfoConfig;
     }
 

@@ -10,7 +10,7 @@ import tech.waitforu.pojo.ast.KrlControlLine;
 import tech.waitforu.pojo.ast.expression.Expression;
 import tech.waitforu.pojo.ast.expression.ExpressionType;
 import tech.waitforu.pojo.ast.expression.Invocation;
-import tech.waitforu.pojo.ast.expression.Variable;
+import tech.waitforu.pojo.ast.expression.VariableExpression;
 import tech.waitforu.pojo.ast.programunit.DataUnit;
 import tech.waitforu.pojo.ast.programunit.FunctionUnit;
 import tech.waitforu.pojo.ast.programunit.ProcedureUnit;
@@ -187,7 +187,8 @@ public class AstBuilderVisitor extends krlBaseVisitor<AstNode> {
 
     @Override
     public AstNode visitSwitchStatement(krlParser.SwitchStatementContext ctx) {
-        String expression = ctx.expression().getText(); //switch中用于匹配比较的表达式
+        // Switch语句中的 表达式，就是变量。
+        Expression expression = (Expression) visit(ctx.expression()); //switch中用于匹配比较的表达式
 
         SwitchStatement switchStatement = SwitchStatement.builder()
                 .withKrlFile(krlFile)
@@ -303,7 +304,7 @@ public class AstBuilderVisitor extends krlBaseVisitor<AstNode> {
 
     @Override
     public AstNode visitVariablePrimary(krlParser.VariablePrimaryContext ctx) {
-        return Variable.builder()
+        return VariableExpression.builder()
                 .withKrlFile(krlFile)
                 .withStartIndex(ctx.getStart().getStartIndex())
                 .withStopIndex(ctx.getStop().getStopIndex())

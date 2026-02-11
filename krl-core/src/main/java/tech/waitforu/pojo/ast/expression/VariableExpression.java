@@ -1,17 +1,17 @@
 package tech.waitforu.pojo.ast.expression;
 
 /**
- * ClassName: expression.ast.pojo.tech.waitforu.Variable
+ * ClassName: expression.ast.pojo.tech.waitforu.VariableExpression
  * Package: tech.waitforu.pojo.ast.expression
  * Description:
  * Author: LiuKe
  * Create: 2025/12/21 13:22
  * Version 1.0
  */
-public class Variable extends tech.waitforu.pojo.ast.expression.AbstractExpression implements tech.waitforu.pojo.ast.expression.Expression {
+public class VariableExpression extends tech.waitforu.pojo.ast.expression.AbstractExpression implements tech.waitforu.pojo.ast.expression.Expression {
     private String variableName; //变量名
 
-    private Variable(VariableBuilder builder){
+    private VariableExpression(VariableBuilder builder){
         super(builder);
         this.variableName = builder.variableName;
     }
@@ -41,8 +41,8 @@ public class Variable extends tech.waitforu.pojo.ast.expression.AbstractExpressi
         }
 
         @Override
-        public Variable build() {
-            return new Variable(this);
+        public VariableExpression build() {
+            return new VariableExpression(this);
         }
     }
 }
