@@ -16,26 +16,52 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 
 /**
- * 管理 Web 侧配置文件的路径、读取和默认落盘。
+ * Web 层配置存储服务。
+ * <p>
+ * 负责：
+ * 1. 统一确定配置文件路径；
+ * 2. 启动时自动初始化默认配置；
+ * 3. 对外提供配置读取与配置解析能力。
  */
 @Service
 public class ConfigStorageService {
     // 标准化后的配置文件绝对路径
     private final Path configPath;
 
+    /**
+     * 构造配置存储服务并规范化配置路径。
+     *
+     * @param configPathValue 配置路径（支持从配置项注入）
+     */
     public ConfigStorageService(@Value("${krl.config.path:${user.home}/.KrlParser/Config.yml}") String configPathValue) {
         this.configPath = Path.of(configPathValue).toAbsolutePath().normalize();
     }
 
+    /**
+     * Bean 初始化后执行，确保磁盘上存在可用配置文件。
+     *
+     * @throws IOException 初始化配置文件失败时抛出
+     */
     @PostConstruct
     public void initialize() throws IOException {
         ensureConfigFileExists();
     }
 
+    /**
+     * 获取配置文件绝对路径文本。
+     *
+     * @return 绝对路径字符串
+     */
     public String getConfigPathText() {
         return configPath.toString();
     }
 
+    /**
+     * 读取配置文件文本内容。
+     *
+     * @return UTF-8 编码的配置文本
+     * @throws IOException 读取失败时抛出
+     */
     public String getConfigContent() throws IOException {
         ensureConfigFileExists();
         return Files.readString(configPath, StandardCharsets.UTF_8);
@@ -43,6 +69,10 @@ public class ConfigStorageService {
 
     /**
      * 优先使用请求内配置文本，否则读取磁盘配置。
+     *
+     * @param inlineConfigText 前端传入配置文本，可为空
+     * @return 解析后的配置对象
+     * @throws IOException 配置格式错误或读取失败时抛出
      */
     public Config resolveConfig(String inlineConfigText) throws IOException {
         if (StringUtils.hasText(inlineConfigText)) {
@@ -55,6 +85,7 @@ public class ConfigStorageService {
 
     /**
      * 确保配置文件目录存在，若不存在则创建，同时从resources/config.yml中复制默认配置。
+     *
      * @throws IOException 如果创建目录或复制默认配置文件时发生 I/O 错误
      */
     private void ensureConfigFileExists() throws IOException {

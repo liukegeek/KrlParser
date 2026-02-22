@@ -1,12 +1,7 @@
 package tech.waitforu.pojo.ast.statements;
 
 /**
- * ClassName: statements.ast.pojo.tech.waitforu.StatementType
- * Package: tech.waitforu.pojo.ast
- * Description:
- * Author: LiuKe
- * Create: 2025/12/12 16:03
- * Version 1.0
+ * 语句类型枚举。
  */
 public enum StatementType{
     IF_ELSE, // if-else语句

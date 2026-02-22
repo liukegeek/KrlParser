@@ -56,9 +56,17 @@ public class CallGraphExcelExportService {
             NodeType.P_PROGRAM,
             NodeType.CAR_CODE,
             NodeType.CAR_PROGRAM,
-            NodeType.ROUTE_PROCESS
+            NodeType.ROUTE_PROCESS,
+            NodeType.VIRTUAL
     );
 
+    /**
+     * 将机器人调用关系列表导出为 xlsx 字节流。
+     *
+     * @param robotInfoList 机器人信息列表
+     * @return xlsx 文件字节数组
+     * @throws IOException 写入工作簿失败时抛出
+     */
     public byte[] export(List<RobotInfo> robotInfoList) throws IOException {
         if (robotInfoList == null || robotInfoList.isEmpty()) {
             throw new IllegalArgumentException("导出失败：机器人列表为空");
@@ -68,6 +76,7 @@ public class CallGraphExcelExportService {
             WorkbookStyles styles = new WorkbookStyles(workbook);
             Set<String> usedSheetNames = new LinkedHashSet<>();
 
+            // 每个机器人生成一个独立 Sheet，便于按机器人维度阅读。
             for (int i = 0; i < robotInfoList.size(); i++) {
                 RobotInfo robotInfo = robotInfoList.get(i);
                 String sheetName = buildSheetName(robotInfo, i, usedSheetNames);
@@ -80,6 +89,13 @@ public class CallGraphExcelExportService {
         }
     }
 
+    /**
+     * 渲染单个机器人对应的 Sheet。
+     *
+     * @param sheet 目标工作表
+     * @param robotInfo 机器人信息
+     * @param styles 复用样式集合
+     */
     private void renderRobotSheet(Sheet sheet, RobotInfo robotInfo, WorkbookStyles styles) {
         TreeBuildResult treeBuildResult = buildTreeModel(robotInfo);
         List<TreePathRow> treeRows = treeBuildResult.treeRows();
@@ -115,6 +131,12 @@ public class CallGraphExcelExportService {
         }
     }
 
+    /**
+     * 写入树形区域标题与列头。
+     *
+     * @param sheet 目标工作表
+     * @param styles 样式集合
+     */
     private void writeTreeHeader(Sheet sheet, WorkbookStyles styles) {
         Row titleRow = getOrCreateRow(sheet, TREE_TITLE_ROW);
         for (int col = 0; col < 5; col++) {
@@ -132,6 +154,14 @@ public class CallGraphExcelExportService {
         }
     }
 
+    /**
+     * 写入树形区域数据行。
+     *
+     * @param sheet 目标工作表
+     * @param styles 样式集合
+     * @param treeRows 树路径行
+     * @param treeRowCount 行数
+     */
     private void writeTreeRows(Sheet sheet, WorkbookStyles styles, List<TreePathRow> treeRows, int treeRowCount) {
         for (int index = 0; index < treeRowCount; index++) {
             Row row = getOrCreateRow(sheet, TREE_DATA_START_ROW + index);
@@ -152,6 +182,15 @@ public class CallGraphExcelExportService {
         }
     }
 
+    /**
+     * 对树形区按列执行纵向合并。
+     * <p>
+     * 规则：同列中相邻且文本相同的非空单元格进行合并。
+     *
+     * @param sheet 目标工作表
+     * @param startRow 起始行
+     * @param endRow 结束行
+     */
     private void mergeTreeColumns(Sheet sheet, int startRow, int endRow) {
         for (int col = 0; col < LEVEL_ORDER.size(); col++) {
             int mergeStart = startRow;
@@ -173,6 +212,15 @@ public class CallGraphExcelExportService {
         }
     }
 
+    /**
+     * 条件合并区域。
+     *
+     * @param sheet 工作表
+     * @param startRow 起始行
+     * @param endRow 结束行
+     * @param col 列索引
+     * @param value 待判断文本值
+     */
     private void mergeRangeIfNeeded(Sheet sheet, int startRow, int endRow, int col, String value) {
         if (startRow >= endRow) {
             return;
@@ -183,6 +231,14 @@ public class CallGraphExcelExportService {
         sheet.addMergedRegion(new CellRangeAddress(startRow, endRow, col, col));
     }
 
+    /**
+     * 写入调用关系矩阵标题行与表头角标。
+     *
+     * @param sheet 工作表
+     * @param styles 样式集合
+     * @param relationTitleRow 标题行
+     * @param relationHeaderRow 头部行
+     */
     private void writeRelationHeader(Sheet sheet, WorkbookStyles styles, int relationTitleRow, int relationHeaderRow) {
         Row titleRow = getOrCreateRow(sheet, relationTitleRow);
         for (int col = 0; col < 5; col++) {
@@ -198,6 +254,20 @@ public class CallGraphExcelExportService {
         corner.setBlank();
     }
 
+    /**
+     * 写入调用关系矩阵主体。
+     * <p>
+     * 逻辑说明：
+     * 1. 初始化行列头与空白矩阵；
+     * 2. 将直调关系写入矩阵交叉单元格；
+     * 3. 对每列在首个直调单元格上方填充向上箭头。
+     *
+     * @param sheet 工作表
+     * @param styles 样式集合
+     * @param orderedNodes 有序节点列表
+     * @param directEdges 直接调用边集合
+     * @param matrixStartRow 矩阵起始行
+     */
     private void writeRelationMatrix(
             Sheet sheet,
             WorkbookStyles styles,
@@ -282,6 +352,12 @@ public class CallGraphExcelExportService {
         }
     }
 
+    /**
+     * 调整列宽。
+     *
+     * @param sheet 工作表
+     * @param orderedNodes 有序节点列表
+     */
     private void adjustColumnWidths(Sheet sheet, List<NodeKey> orderedNodes) {
         // 左半区固定 5 列
         for (int col = 0; col < 5; col++) {
@@ -297,6 +373,15 @@ public class CallGraphExcelExportService {
         }
     }
 
+    /**
+     * 根据调用树构建导出所需中间模型：
+     * 1. 树路径行；
+     * 2. 有序节点清单；
+     * 3. 直接调用边集合。
+     *
+     * @param robotInfo 机器人信息
+     * @return 构建结果
+     */
     private TreeBuildResult buildTreeModel(RobotInfo robotInfo) {
         CallNode root = robotInfo != null ? robotInfo.getCallGraphRoot() : null;
         if (root == null) {
@@ -323,6 +408,14 @@ public class CallGraphExcelExportService {
         return new TreeBuildResult(treeRows, orderedNodes, directEdges);
     }
 
+    /**
+     * 深度优先遍历调用树并抽取树形路径。
+     *
+     * @param node 当前节点
+     * @param path 当前路径快照
+     * @param rows 输出路径行集合
+     * @param orderedByType 按类型分组且保持插入顺序的节点集合
+     */
     private void walkTree(
             CallNode node,
             EnumMap<NodeType, NodeKey> path,
@@ -353,6 +446,12 @@ public class CallGraphExcelExportService {
         }
     }
 
+    /**
+     * 根据树形路径行提取直接边集合。
+     *
+     * @param rows 树路径行列表
+     * @return 直接调用边集合
+     */
     private Set<DirectEdge> collectDirectEdges(List<TreePathRow> rows) {
         Set<DirectEdge> directEdges = new LinkedHashSet<>();
         for (TreePathRow row : rows) {
@@ -364,6 +463,13 @@ public class CallGraphExcelExportService {
         return directEdges;
     }
 
+    /**
+     * 向集合中按需添加一条边（自动忽略空节点与自环）。
+     *
+     * @param directEdges 目标集合
+     * @param from 调用方
+     * @param to 被调用方
+     */
     private void addEdgeIfPresent(Set<DirectEdge> directEdges, NodeKey from, NodeKey to) {
         if (from == null || to == null) {
             return;
@@ -374,6 +480,14 @@ public class CallGraphExcelExportService {
         directEdges.add(new DirectEdge(from, to));
     }
 
+    /**
+     * 规范化节点类型。
+     * <p>
+     * 当前将 VIRTUAL 映射到 P_PROGRAM，保证导出分层稳定。
+     *
+     * @param nodeType 原始节点类型
+     * @return 规范化后类型
+     */
     private NodeType normalizeType(NodeType nodeType) {
         if (nodeType == null) {
             return null;
@@ -384,6 +498,13 @@ public class CallGraphExcelExportService {
         return nodeType;
     }
 
+    /**
+     * 将 CallNode 转换为 NodeKey。
+     *
+     * @param node 调用节点
+     * @param normalizedType 规范化类型
+     * @return NodeKey；无法构建时返回 null
+     */
     private NodeKey toNodeKey(CallNode node, NodeType normalizedType) {
         if (node == null || normalizedType == null) {
             return null;
@@ -398,6 +519,12 @@ public class CallGraphExcelExportService {
         return new NodeKey(normalizedType, value);
     }
 
+    /**
+     * 获取当前节点的 CallNode 子节点列表。
+     *
+     * @param node 当前节点
+     * @return 子调用节点列表
+     */
     private List<CallNode> getCallChildren(CallNode node) {
         if (node == null || node.getChildren() == null || node.getChildren().isEmpty()) {
             return Collections.emptyList();
@@ -411,6 +538,14 @@ public class CallGraphExcelExportService {
         return children;
     }
 
+    /**
+     * 构建合法且唯一的 Sheet 名称。
+     *
+     * @param robotInfo 机器人信息
+     * @param index 机器人索引
+     * @param usedSheetNames 已使用名称集合
+     * @return Sheet 名称
+     */
     private String buildSheetName(RobotInfo robotInfo, int index, Set<String> usedSheetNames) {
         String rawName = robotInfo != null ? safeText(robotInfo.getRobotName()) : "";
         if (rawName.isBlank()) {
@@ -434,6 +569,13 @@ public class CallGraphExcelExportService {
         return candidate;
     }
 
+    /**
+     * 文本截断，超长时保留前缀。
+     *
+     * @param text 原文本
+     * @param maxLength 最大长度
+     * @return 截断结果
+     */
     private String truncate(String text, int maxLength) {
         if (text == null) {
             return "";
@@ -444,6 +586,14 @@ public class CallGraphExcelExportService {
         return text.substring(0, Math.max(maxLength, 0));
     }
 
+    /**
+     * 读取单元格文本内容。
+     *
+     * @param sheet 工作表
+     * @param rowIndex 行索引
+     * @param colIndex 列索引
+     * @return 文本值；无值返回空字符串
+     */
     private String readCellText(Sheet sheet, int rowIndex, int colIndex) {
         Row row = sheet.getRow(rowIndex);
         if (row == null) {
@@ -460,27 +610,68 @@ public class CallGraphExcelExportService {
         };
     }
 
+    /**
+     * 获取或创建行对象。
+     *
+     * @param sheet 工作表
+     * @param rowIndex 行索引
+     * @return 行对象
+     */
     private Row getOrCreateRow(Sheet sheet, int rowIndex) {
         Row row = sheet.getRow(rowIndex);
         return row != null ? row : sheet.createRow(rowIndex);
     }
 
+    /**
+     * 获取或创建单元格对象。
+     *
+     * @param row 行对象
+     * @param colIndex 列索引
+     * @return 单元格对象
+     */
     private Cell getOrCreateCell(Row row, int colIndex) {
         Cell cell = row.getCell(colIndex);
         return cell != null ? cell : row.createCell(colIndex);
     }
 
+    /**
+     * 安全文本化：null 转空串并去除首尾空白。
+     *
+     * @param value 原文本
+     * @return 安全文本
+     */
     private String safeText(String value) {
         return value == null ? "" : value.trim();
     }
 
+    /**
+     * 树模型构建结果。
+     *
+     * @param treeRows 树路径行
+     * @param orderedNodes 有序节点列表
+     * @param directEdges 直接调用边
+     */
     private record TreeBuildResult(List<TreePathRow> treeRows, List<NodeKey> orderedNodes, Set<DirectEdge> directEdges) {
+        /**
+         * 空结果工厂方法。
+         *
+         * @return 空构建结果
+         */
         private static TreeBuildResult empty() {
             return new TreeBuildResult(List.of(), List.of(), Set.of());
         }
     }
 
+    /**
+     * 单条树路径行（固定 5 层）。
+     */
     private record TreePathRow(NodeKey cell, NodeKey pProgram, NodeKey carCode, NodeKey carProgram, NodeKey routeProgram) {
+        /**
+         * 由当前路径快照构建行对象。
+         *
+         * @param path 路径快照
+         * @return 路径行
+         */
         private static TreePathRow fromPath(Map<NodeType, NodeKey> path) {
             return new TreePathRow(
                     path.get(NodeType.CEll),
@@ -491,10 +682,21 @@ public class CallGraphExcelExportService {
             );
         }
 
+        /**
+         * 创建空路径行。
+         *
+         * @return 空行
+         */
         private static TreePathRow empty() {
             return new TreePathRow(null, null, null, null, null);
         }
 
+        /**
+         * 按列索引读取节点。
+         *
+         * @param colIndex 列索引
+         * @return 对应层级节点
+         */
         private NodeKey nodeAt(int colIndex) {
             return switch (colIndex) {
                 case 0 -> cell;
@@ -507,15 +709,31 @@ public class CallGraphExcelExportService {
         }
     }
 
+    /**
+     * 矩阵节点主键（类型 + 显示值）。
+     */
     private record NodeKey(NodeType type, String value) {
+        /**
+         * 用于去重的唯一键（类型 + 小写值）。
+         *
+         * @return 唯一键字符串
+         */
         private String uniqueKey() {
             return type + "::" + value.toLowerCase(Locale.ROOT);
         }
     }
 
+    /**
+     * 直接调用关系边。
+     */
     private record DirectEdge(NodeKey from, NodeKey to) {
     }
 
+    /**
+     * 工作簿样式集合。
+     * <p>
+     * 统一集中创建并复用，避免大量重复创建 CellStyle 导致性能与样式上限问题。
+     */
     private static final class WorkbookStyles {
         private static final String COLOR_CELL = "F54A45";
         private static final String COLOR_P_PROGRAM = "B3D600";
@@ -536,6 +754,11 @@ public class CallGraphExcelExportService {
         private final Map<NodeType, CellStyle> matrixRowHeaderStyles;
         private final Map<NodeType, CellStyle> matrixDirectStyles;
 
+        /**
+         * 构建全部样式。
+         *
+         * @param workbook 工作簿
+         */
         private WorkbookStyles(XSSFWorkbook workbook) {
             XSSFFont normalFont = createFont(workbook, "000000", 11);
             XSSFFont titleFont = createFont(workbook, COLOR_CELL, 11);
@@ -569,46 +792,84 @@ public class CallGraphExcelExportService {
             }
         }
 
+        /** @return 树形区标题样式 */
         private CellStyle treeTitleStyle() {
             return treeTitleStyle;
         }
 
+        /** @return 树形区列表头样式 */
         private CellStyle treeHeaderStyle() {
             return treeHeaderStyle;
         }
 
+        /**
+         * 获取树形区节点样式。
+         *
+         * @param type 节点类型
+         * @return 对应样式
+         */
         private CellStyle treeNodeStyle(NodeType type) {
             return treeNodeStyles.getOrDefault(type, matrixBlankStyle);
         }
 
+        /** @return 关系矩阵标题样式 */
         private CellStyle relationTitleStyle() {
             return relationTitleStyle;
         }
 
+        /** @return 矩阵左上角样式 */
         private CellStyle matrixCornerStyle() {
             return matrixCornerStyle;
         }
 
+        /**
+         * 获取矩阵列表头样式。
+         *
+         * @param type 节点类型
+         * @return 对应样式
+         */
         private CellStyle matrixColumnHeaderStyle(NodeType type) {
             return matrixColumnHeaderStyles.getOrDefault(type, matrixCornerStyle);
         }
 
+        /**
+         * 获取矩阵行表头样式。
+         *
+         * @param type 节点类型
+         * @return 对应样式
+         */
         private CellStyle matrixRowHeaderStyle(NodeType type) {
             return matrixRowHeaderStyles.getOrDefault(type, matrixCornerStyle);
         }
 
+        /**
+         * 获取矩阵直调单元格样式。
+         *
+         * @param callerType 调用方类型
+         * @return 对应样式
+         */
         private CellStyle matrixDirectStyle(NodeType callerType) {
             return matrixDirectStyles.getOrDefault(callerType, matrixBlankStyle);
         }
 
+        /** @return 矩阵空白单元格样式 */
         private CellStyle matrixBlankStyle() {
             return matrixBlankStyle;
         }
 
+        /** @return 箭头提示样式 */
         private CellStyle matrixArrowStyle() {
             return matrixArrowStyle;
         }
 
+        /**
+         * 创建字体对象。
+         *
+         * @param workbook 工作簿
+         * @param colorHex 颜色十六进制（可空）
+         * @param size 字号
+         * @return 字体对象
+         */
         private XSSFFont createFont(XSSFWorkbook workbook, String colorHex, int size) {
             XSSFFont font = workbook.createFont();
             font.setFontName("Calibri");
@@ -619,6 +880,18 @@ public class CallGraphExcelExportService {
             return font;
         }
 
+        /**
+         * 创建单元格样式对象。
+         *
+         * @param workbook 工作簿
+         * @param font 字体
+         * @param fillColor 填充颜色
+         * @param withBorder 是否加边框
+         * @param horizontalAlignment 水平对齐
+         * @param verticalAlignment 垂直对齐
+         * @param wrapText 是否自动换行
+         * @return 样式对象
+         */
         private CellStyle createStyle(
                 XSSFWorkbook workbook,
                 XSSFFont font,
@@ -648,6 +921,12 @@ public class CallGraphExcelExportService {
             return style;
         }
 
+        /**
+         * 解析十六进制颜色字符串。
+         *
+         * @param hex 十六进制颜色（支持 #RRGGBB 或 AARRGGBB）
+         * @return XSSFColor
+         */
         private XSSFColor parseColor(String hex) {
             String normalized = hex.replace("#", "");
             if (normalized.length() == 8) {
@@ -660,6 +939,12 @@ public class CallGraphExcelExportService {
             return new XSSFColor(rgb, null);
         }
 
+        /**
+         * 将 6 位十六进制颜色转为 RGB 字节数组。
+         *
+         * @param hex 十六进制颜色（RRGGBB）
+         * @return RGB 字节数组
+         */
         private byte[] hexToBytes(String hex) {
             byte[] bytes = new byte[3];
             for (int i = 0; i < 3; i++) {

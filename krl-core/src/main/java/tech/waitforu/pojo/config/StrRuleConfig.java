@@ -4,29 +4,48 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * ClassName: config.pojo.tech.waitforu.StrRuleConfig
- * Package: tech.waitforu.pojo
- * Description: yaml中的字符串规则配置信息 对应的数据模型，用于加载和解析文件。
- * Author: LiuKe
- * Create: 2025/12/10 15:35
- * Version 1.0
+ * 字符串规则配置模型。
+ * <p>
+ * 用于描述前缀/后缀匹配规则列表。
  */
 public class StrRuleConfig {
+    /** 前缀规则列表。 */
     private List<String> prefix = new ArrayList<>();
+    /** 后缀规则列表。 */
     private List<String> suffix = new ArrayList<>();
 
+    /**
+     * 获取前缀规则列表。
+     *
+     * @return 前缀规则列表
+     */
     public List<String> getPrefix() {
         return prefix;
     }
 
+    /**
+     * 设置前缀规则列表。
+     *
+     * @param prefix 前缀规则列表
+     */
     public void setPrefix(List<String> prefix) {
         this.prefix = prefix;
     }
 
+    /**
+     * 获取后缀规则列表。
+     *
+     * @return 后缀规则列表
+     */
     public List<String> getSuffix() {
         return suffix;
     }
 
+    /**
+     * 设置后缀规则列表。
+     *
+     * @param suffix 后缀规则列表
+     */
     public void setSuffix(List<String> suffix) {
         this.suffix = suffix;
     }

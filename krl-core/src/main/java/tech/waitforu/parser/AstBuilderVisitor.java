@@ -28,20 +28,33 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * ClassName: parser.tech.waitforu.AstBuilderVisitor
- * Package: tech.waitforu
- * Description:
- * Author: LiuKe
- * Create: 2025/12/12 10:48
- * Version 1.0
+ * KRL 语法树到业务 AST 的构建访问器。
+ * <p>
+ * 该 Visitor 在 ANTLR 解析树基础上提炼业务关心的结构：
+ * - 文件根节点（KrlRoot/KrlBody）
+ * - 程序单元（Procedure/Function/Data）
+ * - 语句（Switch/Loop/Expression）
+ * - 表达式（Invocation/Variable）
  */
 public class AstBuilderVisitor extends krlBaseVisitor<AstNode> {
+    /** 当前正在构建 AST 的源文件元信息。 */
     KrlFile krlFile;
 
+    /**
+     * 创建 AST 构建访问器。
+     *
+     * @param krlFile 当前被解析的 KRL 文件
+     */
     public AstBuilderVisitor(KrlFile krlFile) {
         this.krlFile = krlFile;
     }
 
+    /**
+     * 访问 dat 文件入口并构建 KrlRoot。
+     *
+     * @param ctx dat 文件语法上下文
+     * @return dat 文件 AST 根节点
+     */
     @Override
     public AstNode visitDataFile(krlParser.DataFileContext ctx) {
         KrlRoot krlRoot = new KrlRoot(ctx.getStart().getStartIndex(), ctx.getStop().getStopIndex(), krlFile);
@@ -63,12 +76,16 @@ public class AstBuilderVisitor extends krlBaseVisitor<AstNode> {
         return krlRoot;
     }
 
-    // 提取moduleData，添加进krlBody中。
-    // dataUnit未设计完全，故不继续向下遍历了。
+    /**
+     * 访问 moduleData 并构建数据单元。
+     * <p>
+     * 当前仅保留数据单元框架，具体 data 声明细节暂未展开。
+     *
+     * @param ctx moduleData 上下文
+     * @return KrlBody
+     */
     @Override
     public AstNode visitModuleData(krlParser.ModuleDataContext ctx) {
-
-
         KrlBody krlBody = new KrlBody(ctx.getStart().getStartIndex(), ctx.getStop().getStopIndex(), krlFile);
 
         DataUnit dataUnit = new DataUnit(ctx.getStart().getStartIndex(), ctx.getStop().getStopIndex(), krlFile);
@@ -83,13 +100,27 @@ public class AstBuilderVisitor extends krlBaseVisitor<AstNode> {
         return krlBody;
     }
 
+    /**
+     * 访问数据列表节点。
+     * <p>
+     * 当前版本暂未实现 dataList 精细化抽象。
+     *
+     * @param ctx dataList 上下文
+     * @return null（占位实现）
+     */
     @Override
     public AstNode visitDataList(krlParser.DataListContext ctx) {
         System.out.println("暂未定义visitDataList相关方法");
-        return null;
+        throw new RuntimeException("暂未定义visitDataList相关方法");
+//        return null;
     }
 
-    // 提取sourceFile，添加进krlRoot中。
+    /**
+     * 访问 src 文件入口并构建 KrlRoot。
+     *
+     * @param ctx src 文件语法上下文
+     * @return src 文件 AST 根节点
+     */
     @Override
     public AstNode visitSourceFile(krlParser.SourceFileContext ctx) {
 
@@ -111,6 +142,12 @@ public class AstBuilderVisitor extends krlBaseVisitor<AstNode> {
         return krlRoot;
     }
 
+    /**
+     * 访问模块源码主体，提取主程序与子程序。
+     *
+     * @param ctx moduleSource 上下文
+     * @return 包含主/子程序单元的 KrlBody
+     */
     @Override
     public AstNode visitModuleSource(krlParser.ModuleSourceContext ctx) {
         KrlBody krlBody = new KrlBody(ctx.getStart().getStartIndex(), ctx.getStop().getStopIndex(), krlFile);
@@ -131,9 +168,14 @@ public class AstBuilderVisitor extends krlBaseVisitor<AstNode> {
     }
 
 
+    /**
+     * 构建过程（Procedure）程序单元。
+     *
+     * @param ctx 过程定义上下文
+     * @return ProcedureUnit
+     */
     @Override
     public AstNode visitProcedureDefinition(krlParser.ProcedureDefinitionContext ctx) {
-//        System.out.println("进入了visitProcedureDefinition");
         ProcedureUnit procedureUnit = new ProcedureUnit(ctx.getStart().getStartIndex(), ctx.getStop().getStopIndex(), krlFile);
         procedureUnit.setName(ctx.procedureName().getText());
         procedureUnit.setType(ProgramUnitType.PROCEDURE);
@@ -157,6 +199,12 @@ public class AstBuilderVisitor extends krlBaseVisitor<AstNode> {
         return procedureUnit;
     }
 
+    /**
+     * 构建函数（Function）程序单元。
+     *
+     * @param ctx 函数定义上下文
+     * @return FunctionUnit
+     */
     @Override
     public AstNode visitFunctionDefinition(krlParser.FunctionDefinitionContext ctx) {
         FunctionUnit functionUnit = new FunctionUnit(ctx.getStart().getStartIndex(), ctx.getStop().getStopIndex(), krlFile);
@@ -185,6 +233,12 @@ public class AstBuilderVisitor extends krlBaseVisitor<AstNode> {
         return functionUnit;
     }
 
+    /**
+     * 构建 switch 语句节点。
+     *
+     * @param ctx switch 语句上下文
+     * @return SwitchStatement
+     */
     @Override
     public AstNode visitSwitchStatement(krlParser.SwitchStatementContext ctx) {
         // Switch语句中的 表达式，就是变量。
@@ -205,6 +259,7 @@ public class AstBuilderVisitor extends krlBaseVisitor<AstNode> {
         List<krlParser.CaseLabelsContext> caseLabelsList = switchBody.caseLabels();
         List<krlParser.StatementListContext> statementListList = switchBody.statementList();
 
+        // caseLabels 与 statementList 一一对应，逐组构建 CaseBlock。
         for (int i = 0; i < caseLabelsList.size(); i++) {
             CaseBlock caseBlock = CaseBlock.builder()
                     .withKrlFile(krlFile)
@@ -246,6 +301,12 @@ public class AstBuilderVisitor extends krlBaseVisitor<AstNode> {
     }
 
 
+    /**
+     * 构建 loop 语句节点。
+     *
+     * @param ctx loop 语句上下文
+     * @return LoopStatement
+     */
     @Override
     public AstNode visitLoopStatement(krlParser.LoopStatementContext ctx) {
         LoopStatement loopStatement = LoopStatement.builder()
@@ -263,6 +324,12 @@ public class AstBuilderVisitor extends krlBaseVisitor<AstNode> {
         return loopStatement;
     }
 
+    /**
+     * 构建表达式语句节点。
+     *
+     * @param ctx 表达式语句上下文
+     * @return ExpressionStatement
+     */
     @Override
     public AstNode visitExpressionStatement(krlParser.ExpressionStatementContext ctx) {
         return ExpressionStatement.builder()
@@ -276,12 +343,24 @@ public class AstBuilderVisitor extends krlBaseVisitor<AstNode> {
     }
 
 
+    /**
+     * 主表达式透传：返回其 primary 子节点的访问结果。
+     *
+     * @param ctx primaryExpression 上下文
+     * @return primary 对应 AST 节点
+     */
     @Override
     public AstNode visitPrimaryExpression(krlParser.PrimaryExpressionContext ctx) {
         //返回primary表达式的结果
         return visit(ctx.primary());
     }
 
+    /**
+     * 构建调用表达式（Invocation）。
+     *
+     * @param ctx 调用表达式上下文
+     * @return Invocation 节点
+     */
     @Override
     public AstNode visitInvokeCallablePrimary(krlParser.InvokeCallablePrimaryContext ctx) {
         Invocation invocation = Invocation.builder()
@@ -302,6 +381,12 @@ public class AstBuilderVisitor extends krlBaseVisitor<AstNode> {
         return invocation;
     }
 
+    /**
+     * 构建变量表达式节点。
+     *
+     * @param ctx 变量表达式上下文
+     * @return VariableExpression
+     */
     @Override
     public AstNode visitVariablePrimary(krlParser.VariablePrimaryContext ctx) {
         return VariableExpression.builder()

@@ -1,31 +1,48 @@
 package tech.waitforu.pojo.ast.statements;
 
 /**
- * ClassName: statements.ast.pojo.tech.waitforu.LoopStatement
- * Package: tech.waitforu.pojo.ast
- * Description:
- * Author: LiuKe
- * Create: 2025/12/12 15:08
- * Version 1.0
+ * LOOP 语句节点。
  */
 public class LoopStatement extends tech.waitforu.pojo.ast.statements.AbstractStatement implements Statement {
-    // 构造函数
+    /**
+     * 通过 Builder 构建 LOOP 语句。
+     *
+     * @param builder Builder
+     */
     private LoopStatement(LoopBuilder builder) {
         super(builder);
         this.statementType = builder.statementType;
 
     }
 
+    /**
+     * 获取 LOOP 语句 Builder。
+     *
+     * @return Builder
+     */
     public static LoopBuilder builder() {
         return new LoopBuilder();
     }
 
+    /**
+     * LOOP 语句 Builder。
+     */
     public static class LoopBuilder extends StatementBuilder<LoopBuilder> {
+        /**
+         * 返回当前 builder。
+         *
+         * @return 当前 builder
+         */
         @Override
         protected LoopBuilder self() {
             return this;
         }
-        // 构建方法
+
+        /**
+         * 构建 LOOP 语句对象。
+         *
+         * @return LoopStatement
+         */
         @Override
         public LoopStatement build() {
             return new LoopStatement(this);

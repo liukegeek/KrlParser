@@ -3,14 +3,16 @@ package tech.waitforu.pojo.ast.programunit;
 import tech.waitforu.pojo.krl.KrlFile;
 
 /**
- * ClassName: programunit.ast.pojo.tech.waitforu.ProcedureUnit
- * Package: tech.waitforu.pojo.ast.programunit
- * Description:
- * Author: LiuKe
- * Create: 2025/12/15 09:11
- * Version 1.0
+ * PROCEDURE 程序单元节点。
  */
 public class ProcedureUnit extends AbstractProgramUnit implements ProgramUnit, Callable {
+    /**
+     * 构建 PROCEDURE 单元。
+     *
+     * @param startIndex 起始索引
+     * @param stopIndex 结束索引
+     * @param krlFile 所属文件
+     */
     public ProcedureUnit(int startIndex, int stopIndex, KrlFile krlFile) {
         super(startIndex, stopIndex, krlFile);
     }

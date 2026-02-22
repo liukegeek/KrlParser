@@ -3,14 +3,13 @@ package tech.waitforu.pojo.ast.expression;
 import tech.waitforu.pojo.ast.AstNode;
 
 /**
- * ClassName: expression.ast.pojo.tech.waitforu.Expression
- * Package: tech.waitforu.pojo.ast.expression
- * Description:
- * Author: LiuKe
- * Create: 2025/12/15 09:51
- * Version 1.0
+ * 表达式节点接口。
  */
 public interface Expression extends AstNode {
-    // 获取表达式类型
+    /**
+     * 获取表达式类型。
+     *
+     * @return 表达式类型
+     */
     ExpressionType getExpressionType();
 }

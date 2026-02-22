@@ -6,31 +6,47 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * ClassName: ast.pojo.tech.waitforu.AbstractAstNode
- * Package: tech.waitforu.pojo.ast
- * Description: 抽象语法树节点抽象类  （关于用对象作为参数实例化时的联动问题没有解决，似乎必须深拷贝或者取消setter方法）
- * Author: LiuKe
- * Create: 2025/12/11 17:28
- * Version 1.0
+ * AST 节点抽象基类。
+ * <p>
+ * 提供：
+ * 1. 统一的位置信息与文件引用；
+ * 2. 父子关系维护；
+ * 3. 递归检索工具方法；
+ * 4. Builder 基类能力。
  */
 public abstract class AbstractAstNode implements AstNode {
+    /** 源文本起始索引（含）。 */
     private int startIndex;
+    /** 源文本结束索引（含）。 */
     private int stopIndex;
+    /** 节点所属 KRL 文件。 */
     private KrlFile krlFile;
     /**
-     * 所属的KRL文件
+     * 父节点引用。
      */
     private AstNode parent;
+    /** 子节点集合。 */
     private final List<AstNode> children = new ArrayList<>();
 
 
+    /**
+     * 通过位置信息直接构建节点。
+     *
+     * @param startIndex 起始索引
+     * @param stopIndex 结束索引
+     * @param krlFile 所属文件
+     */
     public AbstractAstNode(int startIndex, int stopIndex, KrlFile krlFile) {
         this.startIndex = startIndex;
         this.stopIndex = stopIndex;
         this.krlFile = krlFile;
     }
 
-
+    /**
+     * 通过 Builder 构建节点。
+     *
+     * @param builder Builder
+     */
     protected AbstractAstNode(AstNodeBuilder<?> builder) {
         this.startIndex = builder.startIndex;
         this.stopIndex = builder.stopIndex;
@@ -38,39 +54,79 @@ public abstract class AbstractAstNode implements AstNode {
     }
 
 
+    /**
+     * 获取当前节点对应原始文本。
+     *
+     * @return 原始文本片段
+     */
     @Override
     public String getTextContent() {
         return krlFile.getContent(startIndex, stopIndex);
     }
 
+    /**
+     * 获取起始索引。
+     *
+     * @return 起始索引
+     */
     @Override
     public int getStartIndex() {
         return startIndex;
     }
 
+    /**
+     * 获取结束索引。
+     *
+     * @return 结束索引
+     */
     @Override
     public int getStopIndex() {
         return stopIndex;
     }
 
+    /**
+     * 设置起始索引。
+     *
+     * @param startIndex 起始索引
+     */
     @Override
     public void setStartIndex(int startIndex) {
         this.startIndex = startIndex;
     }
 
+    /**
+     * 设置结束索引。
+     *
+     * @param stopIndex 结束索引
+     */
     @Override
     public void setStopIndex(int stopIndex) {
         this.stopIndex = stopIndex;
     }
 
 
+    /**
+     * 获取父节点。
+     *
+     * @return 父节点
+     */
     @Override
     public AstNode getParent() {
         return parent;
     }
 
 
-    // 修改AbstractAstNode.setParent方法
+    /**
+     * 设置父节点并维护双向关系一致性。
+     * <p>
+     * 逻辑：
+     * 1. 若父节点未变化，直接返回；
+     * 2. 若存在旧父节点，先从旧父节点移除；
+     * 3. 设置新父节点；
+     * 4. 确保新父节点 children 包含当前节点。
+     *
+     * @param parent 新父节点
+     */
     @Override
     public void setParent(AstNode parent) {
         if (this.parent == parent) return;
@@ -90,18 +146,33 @@ public abstract class AbstractAstNode implements AstNode {
     }
 
 
-
+    /**
+     * 获取子节点列表（浅拷贝）。
+     *
+     * @return 子节点列表
+     */
     @Override
     public List<AstNode> getChildren() {
         return new ArrayList<>(children);
     }
 
+    /**
+     * 获取指定索引子节点。
+     *
+     * @param index 子节点索引
+     * @return 子节点
+     */
     @Override
     public AstNode getChild(int index) {
         return children.get(index);
     }
 
-    // 修改AbstractAstNode.addChild方法
+    /**
+     * 添加子节点并维护双向关系一致性。
+     *
+     * @param child 子节点
+     * @return true 表示添加成功
+     */
     @Override
     public boolean addChild(AstNode child) {
         if (child == null) return false;
@@ -110,7 +181,12 @@ public abstract class AbstractAstNode implements AstNode {
         return true;
     }
     
-    // 修改AbstractAstNode.removeChild方法
+    /**
+     * 移除子节点并清理其父引用。
+     *
+     * @param child 子节点
+     * @return 被移除节点；不存在返回 null
+     */
     @Override
     public AstNode removeChild(AstNode child) {
         if (child == null) return null;
@@ -122,11 +198,21 @@ public abstract class AbstractAstNode implements AstNode {
     }
     
 
+    /**
+     * 获取所属 KRL 文件。
+     *
+     * @return KRL 文件
+     */
     @Override
     public KrlFile getKrlFile() {
         return krlFile;
     }
 
+    /**
+     * 设置所属 KRL 文件。
+     *
+     * @param krlFile KRL 文件
+     */
     @Override
     public void setKrlFile(KrlFile krlFile) {
         this.krlFile = krlFile;
@@ -148,7 +234,14 @@ public abstract class AbstractAstNode implements AstNode {
         return result;
     }
 
-    // 私有递归辅助方法，用于深度优先搜索
+    /**
+     * 深度优先递归搜索指定类型节点。
+     *
+     * @param curNode 当前节点
+     * @param clazz 目标类型
+     * @param result 结果容器
+     * @param <T> 目标类型
+     */
     private <T extends AstNode> void searchRecursively(AstNode curNode, Class<T> clazz, List<T> result){
         // 1. 检查当前节点是否是目标类型（或其子类）
         if(clazz.isInstance(curNode)){
@@ -160,6 +253,11 @@ public abstract class AbstractAstNode implements AstNode {
         }
     }
 
+    /**
+     * 递归查找根节点。
+     *
+     * @return 根节点
+     */
     @Override
     public AstNode findRootNode() {
         if (parent == null) {
@@ -171,14 +269,23 @@ public abstract class AbstractAstNode implements AstNode {
 
 
     public abstract static class AstNodeBuilder<T extends AstNodeBuilder<T>> {
+        /** 起始索引。 */
         protected int startIndex;
+        /** 结束索引。 */
         protected int stopIndex;
+        /** 所属文件。 */
         protected KrlFile krlFile;
 
-        // 自引用方法，用于返回当前构建器实例，用于链式调用
-        protected abstract T self();
         /**
-         * 设置起始索引
+         * 返回当前 builder，用于链式调用。
+         *
+         * @return 当前 builder
+         */
+        protected abstract T self();
+
+        /**
+         * 设置起始索引。
+         *
          * @param startIndex 起始索引
          * @return 当前构建器实例
          */
@@ -186,8 +293,10 @@ public abstract class AbstractAstNode implements AstNode {
             this.startIndex = startIndex;
             return self();
         }
+
         /**
-         * 设置结束索引
+         * 设置结束索引。
+         *
          * @param stopIndex 结束索引
          * @return 当前构建器实例
          */
@@ -195,8 +304,10 @@ public abstract class AbstractAstNode implements AstNode {
             this.stopIndex = stopIndex;
             return self();
         }
+
         /**
-         * 设置KRL文件
+         * 设置 KRL 文件。
+         *
          * @param krlFile KRL文件
          * @return 当前构建器实例
          */
@@ -206,7 +317,11 @@ public abstract class AbstractAstNode implements AstNode {
         }
 
 
-        // 抽象构建方法
+        /**
+         * 抽象构建方法。
+         *
+         * @return 构建后的节点
+         */
         public abstract AbstractAstNode build();
 
     }

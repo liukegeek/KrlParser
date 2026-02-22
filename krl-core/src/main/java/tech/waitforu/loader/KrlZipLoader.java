@@ -1,11 +1,4 @@
-package tech.waitforu.loader; /**
- * ClassName: loader.tech.waitforu.KrlZipLoader
- * Package: tech.waitforu
- * Description: 解压压缩包，并获取压缩包中的信息。
- * Author: LiuKe
- * Create: 2025/11/10 14:12
- * Version 1.0
- */
+package tech.waitforu.loader;
 
 import tech.waitforu.rule.IgnoreRuleByStr;
 import tech.waitforu.pojo.krl.KrlFile;
@@ -28,6 +21,12 @@ import java.util.stream.Stream;
 import static java.nio.file.FileSystems.newFileSystem;
 
 
+/**
+ * KRL 备份压缩包加载器。
+ * <p>
+ * 该类将 zip 文件作为文件系统进行遍历，按过滤规则读取符合条件的文件，
+ * 并将路径、时间、大小、文本内容封装为 {@link KrlFile}。
+ */
 public class KrlZipLoader {
 
     // 压缩包中包含的所有KRL文件路径列表
@@ -36,8 +35,15 @@ public class KrlZipLoader {
     // 压缩包中包含的所有KRL文件路径与KrlFile对象的映射关系
     private final Map<String, KrlFile> krlFileMap = new HashMap<>();
 
+    /** 文件过滤规则（true=忽略，false=保留）。 */
     private IgnoreRuleByStr fileIgnoreRuleByStr;
 
+    /**
+     * 构造加载器并立即执行 zip 扫描。
+     *
+     * @param filePath zip 文件路径
+     * @param fileIgnoreRuleByStr 文件过滤规则
+     */
     public KrlZipLoader(String filePath, IgnoreRuleByStr fileIgnoreRuleByStr) {
         this.fileIgnoreRuleByStr = fileIgnoreRuleByStr;
 
@@ -53,12 +59,14 @@ public class KrlZipLoader {
             //即这里将字符串"/"转换为一个 Path 对象，代表压缩包的根目录
             Path root = fs.getPath("/");
 
-            try (Stream<Path> pathStream = Files.walk(root)) {//递归遍历文件树，从指定的起始路径开始，包括所有子目录和文件。它返回一个包含所有遍历到的路径的Stream<Path>，方便进行后续处理。
+            try (Stream<Path> pathStream = Files.walk(root)) {
+                // 递归遍历 zip 中全部路径，依次过滤出普通文件与符合规则的文件。
                 pathStream.filter(Files::isRegularFile)    // 过滤出普通文件，而不是文件夹。
                         .filter(path -> !fileIgnoreRuleByStr.isIgnore(path.toString())) // 过滤出符合规则的文件，即不是应被忽略的文件。
                         .forEach(
                                 path -> {
                                     try {
+                                        // 读取文件文本与基础属性，并缓存到索引结构中。
                                         String content = Files.readString(path, StandardCharsets.ISO_8859_1);
                                         BasicFileAttributes attr = Files.readAttributes(path, BasicFileAttributes.class);
                                         // 获取时间，并解析成我们指定的格式。
@@ -77,6 +85,7 @@ public class KrlZipLoader {
             }
 
         } catch (Exception e1) {
+            // 当前实现保留原有行为：打印异常并继续返回已读取部分结果。
             e1.printStackTrace();
         }
 
@@ -110,14 +119,21 @@ public class KrlZipLoader {
         return krlFileList;
     }
 
+    /**
+     * 获取当前生效的文件过滤规则。
+     *
+     * @return 过滤规则对象
+     */
     public IgnoreRuleByStr getFileIgnoreRuleByStr() {
         return fileIgnoreRuleByStr;
     }
 
-    public void setFileIgnoreRuleByStr(IgnoreRuleByStr fileIgnoreRuleByStr) {
-        this.fileIgnoreRuleByStr = fileIgnoreRuleByStr;
-    }
-
+    /**
+     * 将 zip 中的 ISO 时间字符串转换为项目统一显示格式。
+     *
+     * @param fileTime 文件时间
+     * @return 格式化后的时间字符串
+     */
     private String formatTime(FileTime fileTime) {
         return LocalDateTime.parse(
                 fileTime.toString(),

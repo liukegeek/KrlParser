@@ -1,12 +1,7 @@
 package tech.waitforu.pojo.ast.expression;
 
 /**
- * ClassName: expression.ast.pojo.tech.waitforu.ExpressionType
- * Package: tech.waitforu.pojo.ast.expression
- * Description:
- * Author: LiuKe
- * Create: 2025/12/15 10:06
- * Version 1.0
+ * 表达式类型枚举。
  */
 public enum ExpressionType {
     // 逻辑非表达式

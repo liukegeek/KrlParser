@@ -1,12 +1,7 @@
 package tech.waitforu.pojo.ast.programunit;
 
 /**
- * ClassName: programunit.ast.pojo.tech.waitforu.ProgramUnitType
- * Package: tech.waitforu.pojo.ast.programunit
- * Description:
- * Author: LiuKe
- * Create: 2025/12/15 10:00
- * Version 1.0
+ * 程序单元类型枚举。
  */
 public enum ProgramUnitType {
     DATA,   //数据块

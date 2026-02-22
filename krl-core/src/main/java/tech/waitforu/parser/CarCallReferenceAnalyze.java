@@ -27,32 +27,41 @@ import java.io.IOException;
 import java.util.*;
 
 /**
- * ClassName: parser.tech.waitforu.CarCallReferenceAnalyze
- * Package: tech.waitforu.pojo
- * Description: 用于从KRL模块中分析出车型调用关系
- * Author: LiuKe
- * Create: 2025/12/17 17:00
- * Version 1.0
+ * 车型调用关系分析器。
+ * <p>
+ * 从模块仓库中以 cell 程序为入口，逐层解析并构建调用关系树：
+ * Cell -> P程序(或虚拟P) -> 车型代码 -> 车型程序 -> 轨迹程序。
+ * <p>
+ * 同时维护 {@code existingNodes} 去重，保证同一语义节点只创建一次。
  */
 public class CarCallReferenceAnalyze {
-    //存放解析时临时生成的AST节点。
+    /** 待分析模块仓库。 */
     private final ModuleRepository moduleRepository;
 
-    //解析规则。
+    /** 调用过滤规则（true=忽略）。 */
     private final IgnoreRuleByStr invokerParseRule;
 
-    // 用于处理当前已经处理过的节点ID，避免一个机器人中出现相同节点。
+    /** 已创建节点缓存，避免重复创建导致图中重复节点。 */
     private final Map<String, CarReferenceNode> existingNodes = new HashMap<>();
 
+    /**
+     * 创建分析器。
+     *
+     * @param moduleRepository 模块仓库
+     * @param invokerParseRule 调用过滤规则
+     */
     public CarCallReferenceAnalyze(ModuleRepository moduleRepository, IgnoreRuleByStr invokerParseRule) {
         this.moduleRepository = moduleRepository;
         this.invokerParseRule = invokerParseRule;
     }
 
+    /**
+     * 解析 cell 节点及其下游调用关系。
+     *
+     * @return 调用图根节点（cell）
+     */
     public CallNode analyzeCell() {
         KrlModule cellModule = moduleRepository.findByModuleName("cell");
-        String callableName = "cell";
-
 
         // 解析KRL模块
         ModuleParser moduleParser = new ModuleParser(cellModule);
@@ -82,7 +91,7 @@ public class CarCallReferenceAnalyze {
         List<SwitchStatement> astNodeList = krlRoot.getBody().getMainProgramUnit().findNodesByType(SwitchStatement.class);
         SwitchStatement switchStatement = null;
 
-        // 过滤出通过"PGNO"变量进行判断的SWITCH语句
+        // 1) 从主程序中定位“按 PGNO/GIPGNO 分派程序”的 switch 语句。
         for (SwitchStatement statement : astNodeList) {
             if (statement.getSwitchExpression() instanceof VariableExpression variableExpression) {
                 String switchVariableName = variableExpression.getVariableName();
@@ -98,6 +107,7 @@ public class CarCallReferenceAnalyze {
 
         List<CaseBlock> caseBlockList = switchStatement.getCaseBlocks();
 
+        // 2) 遍历每个 case：提取被调用 P 程序，并根据 case 标签映射 major 车型码。
         caseBlockList.forEach(
                 caseBlock ->
                 {
@@ -112,10 +122,8 @@ public class CarCallReferenceAnalyze {
                                 Expression expression = expressionStatement.getExpression();
                                 if (expression instanceof Invocation invocation) {
                                     String targetName = invocation.getTargetName();
-                                    ProgramUnitType targetType = invocation.getTargetType();
-
                                     if (!invokerParseRule.isIgnore(targetName)) {
-                                        //如果一个case对应多个标签，name会被解析为多个结点。
+                                        // 一个 case 可能有多个标签（如 case 10,11），每个标签都要生成车型分支。
                                         caseLabel.forEach(
                                                 label ->
                                                 {
@@ -139,6 +147,18 @@ public class CarCallReferenceAnalyze {
         return cellNode;
     }
 
+    /**
+     * 解析 P 程序节点。
+     * <p>
+     * 该方法同时覆盖两类场景：
+     * 1. 真实 P 程序（包含 GIPGNO2 分派）；
+     * 2. cell 直接调用车型程序（无 P 程序，降级为 VIRTUAL）。
+     *
+     * @param pProgramModule P 程序模块
+     * @param callableName 可调用程序名
+     * @param majorIndexOfCar 主车型码（来自 cell case）
+     * @return P 程序节点
+     */
     public CallNode parsePProgram(KrlModule pProgramModule, String callableName, int majorIndexOfCar) {
         ModuleParser moduleParser = new ModuleParser(pProgramModule);
         AstNode astNode = moduleParser.getSrcAst();
@@ -178,7 +198,7 @@ public class CarCallReferenceAnalyze {
                 break;
             }
         }
-        //如果遍历完所有变量都没有找到"GIPGNO2"变量，即该模块不是P程序，直接按照车型程序解析。
+        // 如果没有 GIPGNO2，则说明当前 callable 不是 P 分派程序，而是“直接车型程序调用”。
         if (!isPProgram) {
             //是车型程序
             // 由于没有P程序，故而原来P程序的结点类型设置为VIRTUAL。
@@ -208,7 +228,7 @@ public class CarCallReferenceAnalyze {
             }
 
         } else {
-            //是P程序
+            // 标准 P 程序流程：在 P 程序内部继续按 GIPGNO2 分派车型程序。
             List<Statement> statementList = callProgramUnit.getStatementList(StatementType.SWITCH);
             SwitchStatement switchStatement = null;
             for (Statement statement : statementList) {
@@ -227,6 +247,7 @@ public class CarCallReferenceAnalyze {
             }
 
             List<CaseBlock> caseBlockList = switchStatement.getCaseBlocks();
+            // 逐 case 构建“车型代码 -> 车型程序”关系。
             caseBlockList.forEach(
                     caseBlock ->
                     {
@@ -244,7 +265,7 @@ public class CarCallReferenceAnalyze {
                                         ProgramUnitType targetType = invocation.getTargetType();
 
                                         if (!invokerParseRule.isIgnore(targetName)) {
-                                            //如果一个case对应多个标签，name会被解析为多个结点。
+                                            // case 多标签场景，逐标签生成 minor 车型码分支。
                                             caseLabel.forEach(
                                                     label ->
                                                     {
@@ -283,6 +304,13 @@ public class CarCallReferenceAnalyze {
         return pProgramNode;
     }
 
+    /**
+     * 构建车型代码节点（CAR_CODE）。
+     *
+     * @param majorIndexOfCar 主车型索引
+     * @param minorIndexOfCar 次车型索引
+     * @return 车型代码节点（已做去重）
+     */
     public CallNode parseCarCode(int majorIndexOfCar, int minorIndexOfCar) {
         String id = null;
         String value = null;
@@ -303,6 +331,13 @@ public class CarCallReferenceAnalyze {
         return carCode;
     }
 
+    /**
+     * 解析车型程序节点及其轨迹调用。
+     *
+     * @param carProgramModule 车型程序模块
+     * @param callableName 车型程序 callable 名称
+     * @return 车型程序节点（包含子轨迹节点）
+     */
     public CallNode parseCarProgram(KrlModule carProgramModule, String callableName) {
 
         ModuleParser moduleParser = new ModuleParser(carProgramModule);
@@ -333,6 +368,7 @@ public class CarCallReferenceAnalyze {
 
         List<Invocation> invocationList = callProgramUnit.findNodesByType(Invocation.class);
 
+        // 遍历车型程序中的调用表达式，筛选并生成轨迹节点。
         invocationList.forEach(
                 invocation ->
                 {
@@ -347,6 +383,7 @@ public class CarCallReferenceAnalyze {
                         CallNode routeProcessNode = new CallNode(routeNodeId, routeNodeValue, routNodeType, null);
                         //设置结点的补充信息,关于模块文件的。
                         this.setPropertyAboutFile(routeProcessNode, moduleRepository.findByCallableName(targetName));
+                        // 轨迹相关上下文信息来源于当前调用表达式所在根语句文本。
                         String routeNodeRelevantInfo = invocation.findRootNode().getTextContent();
                         routeProcessNode.setRelevantInfo(routeNodeRelevantInfo);
 
@@ -367,12 +404,21 @@ public class CarCallReferenceAnalyze {
     /**
      * 分析备份中的车型调用关系，并返回分析结果。
      *
-     * @return 分析结果，包含车型调用关系的 carcallgraph.pojo.tech.waitforu.CallNode 树。
+     * @return 调用关系树根节点
      */
     public CallNode analyze() {
         return analyzeCell();
     }
 
+    /**
+     * 设置节点对应文件元信息。
+     * <p>
+     * CAR_CODE 属于逻辑节点，不对应真实文件，写入虚构信息；
+     * 其他节点写入 src 文件路径与时间信息。
+     *
+     * @param callNode 目标节点
+     * @param krlModule 节点对应模块（CAR_CODE 可为空）
+     */
     private void setPropertyAboutFile(CallNode callNode, KrlModule krlModule) {
         if (callNode instanceof CarCode carCode) {
             //设置补充信息。
@@ -385,29 +431,5 @@ public class CarCallReferenceAnalyze {
             callNode.addProperty("createTime", krlModule.getModuleSrcFile().getCreateTime()); //创建时间
             callNode.addProperty("modifyTime", krlModule.getModuleSrcFile().getModifyTime()); //修改时间
         }
-    }
-
-
-    public static void main(String[] args) {
-        YamlConfigLoad yamlConfigLoad = new YamlConfigLoad("/Users/liuke/IdeaProjects/KRLParser/krl-core/src/main/resources/config.yml");
-        Config config = null;
-        try {
-            config = yamlConfigLoad.loadConfig();
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-        IgnoreRuleByStr fileLoadRule = new IgnoreRuleByStr(config.getFileLoadSection());
-        IgnoreRuleByStr invokerParseRule = new IgnoreRuleByStr(config.getCarInvokerParseSection());
-        String zipFilePath = "/Users/liuke//Desktop/EC010_L1.zip";
-        KrlZipLoader krlZipLoader = new KrlZipLoader(zipFilePath, fileLoadRule);
-        List<KrlFile> krlFileList = krlZipLoader.getKrlFileList();
-        ModuleRepository moduleRepository = new ModuleRepository();
-        moduleRepository.assembleFromFileList(krlFileList);
-
-        CarCallReferenceAnalyze carCallReferenceAnalyze = new CarCallReferenceAnalyze(moduleRepository, invokerParseRule);
-
-        CallNode carReferenceNode = carCallReferenceAnalyze.analyze();
-
-        System.out.println(carReferenceNode.getValue());
     }
 }

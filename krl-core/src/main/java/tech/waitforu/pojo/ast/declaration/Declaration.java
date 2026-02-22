@@ -5,15 +5,21 @@ import tech.waitforu.pojo.ast.AstNode;
 import java.util.List;
 
 /**
- * ClassName: declaration.ast.pojo.tech.waitforu.Declaration
- * Package: tech.waitforu.pojo.ast.declaration
- * Description:
- * Author: LiuKe
- * Create: 2025/12/15 10:03
- * Version 1.0
+ * 声明节点接口。
  */
 public interface Declaration extends AstNode {
+    /**
+     * 获取声明变量名。
+     *
+     * @return 变量名
+     */
     String getVariableName();
+
+    /**
+     * 获取声明修饰符列表。
+     *
+     * @return 修饰符列表
+     */
     List<String> getModifierList();
 
 }

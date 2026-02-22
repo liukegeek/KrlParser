@@ -1,13 +1,8 @@
 package tech.waitforu.pojo.carcallgraph;
 
 /**
- * ClassName: carcallgraph.pojo.tech.waitforu.NodeType
- * Package: tech.waitforu.pojo.carcallgraph
- * Description: 
- * Author: LiuKe
- * Create: 2025/12/17 16:26 
- * Version 1.0   
-*/
+ * 调用关系图节点类型枚举。
+ */
 public enum NodeType {
     CEll, //cell程序
     P_PROGRAM, //P程序

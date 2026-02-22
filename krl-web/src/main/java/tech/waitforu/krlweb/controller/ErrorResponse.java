@@ -1,12 +1,10 @@
 package tech.waitforu.krlweb.controller;
 
 /**
- * ClassName: controller.tech.waitforu.krlweb.ErrorResponse
- * Package: tech.waitforu.krlweb.controller
- * Description: 统一错误响应。
- * Author: LiuKe
- * Create: 2025/12/21 19:22
- * Version 1.0
+ * 统一错误响应模型。
+ *
+ * @param status HTTP 状态码
+ * @param message 错误描述信息
  */
 public record ErrorResponse(int status, String message) {
 }

@@ -6,16 +6,20 @@ import java.io.IOException;
 import java.io.StringReader;
 
 /**
- * ClassName: IniParser
- * Package: tech.waitforu.parser
- * Description: 从INI格式的字符串中解析出包含目标信息的INI对象
- * Author: LiuKe
- * Create: 2025/12/22 21:56
- * Version 1.0
+ * INI 文本解析器。
+ * <p>
+ * 用于从机器人备份中的 ini 文本中读取元信息字段。
  */
 public class IniParser {
+    /** INI4j 解析后的对象。 */
     private Ini ini;
 
+    /**
+     * 使用字符串内容构建 INI 解析对象。
+     *
+     * @param iniContent ini 文本内容
+     * @throws IOException ini 语法错误或读取异常时抛出
+     */
     public IniParser(String iniContent) throws IOException {
         this.ini = new Ini(new StringReader(iniContent));
     }

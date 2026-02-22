@@ -1,13 +1,8 @@
 package tech.waitforu.pojo.krl;
 
 /**
- * ClassName: krl.pojo.tech.waitforu.KrlFileType
- * Package: tech.waitforu.pojo.krl
- * Description: 
- * Author: LiuKe
- * Create: 2025/12/12 09:33 
- * Version 1.0   
-*/
+ * KRL 文件类型枚举。
+ */
 public enum KrlFileType {
     SRC,  // 源文件
     DAT,  // 数据文件

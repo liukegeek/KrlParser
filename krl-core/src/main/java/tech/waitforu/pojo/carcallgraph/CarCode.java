@@ -1,18 +1,25 @@
 package tech.waitforu.pojo.carcallgraph;
 
 /**
- * ClassName: carcallgraph.pojo.tech.waitforu.CarCode
- * Package: tech.waitforu.pojo.carcallgraph
- * Description:
- * Author: LiuKe
- * Create: 2025/12/18 11:06
- * Version 1.0
+ * 车型代码节点。
+ * <p>
+ * 基于主车型索引与次车型索引计算最终车型编码值。
  */
 public class CarCode extends CallNode {
+    /** 主车型索引（来自 cell/P 程序 case 标签）。 */
     private final int majorIndexOfCar;
+    /** 次车型索引（来自 P 程序 case 标签）。 */
     private final int minorIndexOfCar;
 
 
+    /**
+     * 构建车型代码节点并计算编码值。
+     *
+     * @param id 节点 ID
+     * @param nodeType 节点类型
+     * @param majorIndexOfCar 主车型索引
+     * @param minorIndexOfCar 次车型索引
+     */
     public CarCode(String id, tech.waitforu.pojo.carcallgraph.NodeType nodeType, int majorIndexOfCar, int minorIndexOfCar) {
         super(id, null, nodeType, null);
         this.majorIndexOfCar = majorIndexOfCar;
@@ -22,17 +29,35 @@ public class CarCode extends CallNode {
         setRelevantInfo("大车型:" + majorIndexOfCar + "小车型:" + minorIndexOfCar);
     }
 
+    /**
+     * 获取主车型索引。
+     *
+     * @return 主车型索引
+     */
     public int getMajorIndexOfCar() {
         return majorIndexOfCar;
     }
 
+    /**
+     * 获取次车型索引。
+     *
+     * @return 次车型索引
+     */
     public int getMinorIndexOfCar() {
         return minorIndexOfCar;
     }
 
-    // 根据小车型和大车型，计算出完整的车型
-    //例如majorIndexOfCar = 104,minorIndexOfCar =5,返回值为1054,即：(104-4)*10+5*10+4
-    // majorIndexOfCar = 65,minorIndexOfCar = 3,返回值为635
+    /**
+     * 根据主/次车型索引计算完整车型编码。
+     * <p>
+     * 示例：
+     * 1. major=104, minor=5 -> 1054；
+     * 2. major=65, minor=3 -> 635。
+     *
+     * @param majorIndexOfCar 主车型索引
+     * @param minorIndexOfCar 次车型索引
+     * @return 计算后的车型编码
+     */
     public int getIndexOfCar(int majorIndexOfCar, int minorIndexOfCar) {
         int a = majorIndexOfCar % 10;
         return (majorIndexOfCar - a) * 10 + minorIndexOfCar * 10 + a;

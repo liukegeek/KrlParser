@@ -1,122 +1,266 @@
-# 原理概述
+# KRLParser
 
-![image-20251227004043640](https://obj.waitforu.tech/imgs%2Fblog%2F2025%2F12%2F27%2F004045-a81829839e77f2a19c1cc5398ec1eec9.webp)
+KRLParser 是一款面向 KUKA 机器人备份包的本地 Web 分析工具，用于解析 KRL 程序并生成调用关系。
 
-​	***KRLParser***是一款用于处理kuka机器人备份程序，并进行**车型解析**的跨平台(MacOS、Windows)、本地Web软件。其核心功能是从机器人备份程序中获取车型调用关系，并进行**可视化处理**。便于相关人员直观、清晰的分析现场车型信息。
+它基于以下技术栈：
+- `ANTLR4`：KRL 词法/语法解析
+- `Spring Boot`：本地服务与接口
+- `Cytoscape.js + Dagre`：调用关系可视化
+- `Apache POI`：Excel 导出
 
-​	KRLParser的词法分析(Lexer)、语法分析(Parser)部分依赖于开源软件**Antlr4**。其能够根据提供的词法规则(Lexer Rule)、语法规则(Parser Rule)生成对应的Java代码，并且按照对应规则解析字符串，生成**解析树(Parse tree)**。
+---
 
-​	KRLParser通过生成的解析树来进行**语义分析**，从而忽略细节、抓取主干，建立程序的抽象语法树：AST(Abstract Syntax Tree)。
+## 1. 目标与定位
 
-​	通过备份文件的遍历，将一对`.src`、`.dat`文件聚合成**kuka模块(Kuka Module)**，且从不同模块提取到不同的AST。将所有模块进行统一存储，依据**cell模块**开始的AST中存储的信息、并按照相应规范(由传入**配置文件config**来约束)，最终生成车型调用数据结构：Cell->P_Program->Car_Code->Car_Program->ROUTE_PROCESS。其中**Car_Code**为依据大(PGNO)、小(GIPGNO2)车型对应的**Case**计算而来。
+针对现场备份包中常见的结构：
+`Cell -> P程序 -> 车型代码 -> 车型程序 -> 轨迹程序`，
+KRLParser 提供从压缩包读取、规则过滤、语义解析、图谱展示到 Excel 导出的完整闭环。
 
-​	以上数据结构、算法分析、读写处理等均由Java语言编写。并通过**SpringBoot**框架来获取浏览器界面的HTTP请求(**Http Request**)。处理请求时将车型信息由Java结构转换成对应的**Json**格式传递给浏览器前端界面。
+---
 
-​	交互部分由浏览器前端代码实现。在用户上传`*.zip`**备份文件和**`*.yml`**配置文件**后，浏览器会携带文件发起**请求(Request)**。在Java侧进行逻辑处理后，发回**响应(Response)**。浏览器界面拿到响应的Json后，借助`cytoscape`进行可视化绘制。
+## 2. 新增功能（本次版本重点）
 
-​	综上，本软件是一个基于Anltr4语言分析框架、SpringBoot序列化接口框架、Cytoscape前端可视化渲染框架的跨平台、可交互的本地Web软件。
+### 2.1 配置文件托管与在线编辑
 
-# 功能介绍
+- 启动时自动检查配置文件路径（默认：`~/.KrlParser/Config.yml`）
+- 若不存在，则由 `krl-core/src/main/resources/config.yml` 自动落盘生成
+- 前端进入页面后自动拉取当前配置（`GET /api/config`）
+- 页面新增 `Config` 按钮，可在线查看/编辑本次分析用配置
+- 分析请求时携带 `configText`，无需重复上传配置文件
 
-简要介绍本软件的功能。
+### 2.2 批量上传备份
 
-- 本软件在MacOs下可直接解压出`KRLParser.app`,双击启动即可运行
+- 上传备份支持多选 `*.zip`
+- 后端按批量入口统一解析并汇总
+- 线体视图展示多个机器人节点（名称取 `RobotInfo.robotName`）
+- 点击线体节点进入该机器人对应车型视图
 
-- 本软件在Windows下会解压出`build`文件夹，其可执行文件路径为 `build->dist->KRLParser-> KRLParser.exe`。
+### 2.3 Excel 导出
 
-本软件在运行时需要上传两个文件:
+- 新增 `下载Excel` 按钮，对应接口：`POST /api/analysis/excel`
+- 一个线体（一次分析）导出一个 `.xlsx`
+- 每个机器人对应一个 Sheet
+- Sheet 内包含两部分：
+  - 树形调用结构（5 列分层）
+  - 调用关系矩阵（行调用方、列被调用方、箭头上溯）
 
-- 备份文件，比如`EC010_L1.zip` 。为维持程序正常运行，请保证使用原生备份，不要二次修改。
-- 配置文件，比如`config.yml。`为维持程序正常运行，请保证配置文件遵循`*.yml`格式。(语法上要求严格遵循，文件后缀可以不遵循。)
+---
 
-## 1 调用关系图
+## 3. 核心能力
 
-在上传完两个文件后，点击**开始分析**即可。可以通过鼠标滚轮调整界面大小。
+- KRL 备份包解析（zip 内文件遍历、模块聚合、AST 构建）
+- 规则过滤（前缀/后缀、白名单/黑名单、大小写不敏感）
+- 调用链图可视化
+  - 线体信息视图（机器人级）
+  - 车型信息视图（调用链级）
+  - 单击高亮链路、双击看文件属性、右键看上下文
+- Excel 持久化导出（便于归档和跨平台转发）
 
-![image-20251226235229908](https://obj.waitforu.tech/imgs%2Fblog%2F2025%2F12%2F26%2F235238-16654d4ee49feec99014ee4e8c2347fe.webp)
+---
 
-可通过单击结点，从而高亮整个调用链路。
+## 4. 系统架构
 
-![image-20251226235559041](https://obj.waitforu.tech/imgs%2Fblog%2F2025%2F12%2F26%2F235601-2c084f36a92c1a7f9da41a48e4c26795.webp)
+```mermaid
+flowchart LR
+    A[前端页面<br/>index.html + app.js] -->|multipart/form-data| B[AnalysisController]
+    A -->|GET /api/config| C[ConfigStorageService]
 
-这在车型繁杂时十分有用。从下图中，我们可以很清晰看到:1102、1112、1122、1132、1152、1162、1172以及1104、1114、1154这些10款车型代码，总共调用`SRER`、`SREE`、`SRES`三款车型程序，但最终只调用一套轨迹，并且还包含空补:`sre_weld_02`
+    B --> D[CarCallAnalysisService]
+    D --> E[KrlZipLoader]
+    D --> F[ModuleRepository + ModuleParser]
+    D --> G[CarCallReferenceAnalyze]
+    D --> H[RobotInfo]
 
-![image-20251226235751704](https://obj.waitforu.tech/imgs%2Fblog%2F2025%2F12%2F26%2F235753-7220491c9d8c9d4576132fbd0e0fbc49.webp)
+    B --> I[CallGraphExcelExportService]
+    I --> J[(xlsx bytes)]
 
-可点击左下角**节点调整**来调整大小(当然，鼠标滚轮也可直接整体放大和缩小)
+    C --> K[~/.KrlParser/Config.yml]
+    C --> L[krl-core/resources/config.yml]
+```
 
-![image-20251226235447197](https://obj.waitforu.tech/imgs%2Fblog%2F2025%2F12%2F26%2F235449-599c3de170d0f4781f26a31de10dbf1e.webp)
+### 模块分层
 
-![image-20251226235511846](https://obj.waitforu.tech/imgs%2Fblog%2F2025%2F12%2F26%2F235513-b731e763a1c10c5c4fbad91afd7eba9e.webp)
+- `krl-core`
+  - 解析与语义分析核心
+  - 调用关系构建与规则引擎
+- `krl-web`
+  - Spring Boot 启动与 API
+  - 配置文件托管
+  - Excel 导出
+  - 静态前端页面
 
-结点可以进行拖拽来获得更清晰的结果。
+---
 
-![image-20251227001859044](https://obj.waitforu.tech/imgs%2Fblog%2F2025%2F12%2F27%2F001901-4a69451e265122c5d15069e9eac0739e.webp)
+## 5. 目录结构（关键部分）
 
+```text
+KRLParser/
+├── krl-core/
+│   ├── src/main/resources/config.yml
+│   └── src/main/java/tech/waitforu/
+│       ├── loader/           # zip/yaml 读取
+│       ├── parser/           # AST 与调用关系分析
+│       ├── rule/             # IgnoreRuleByStr
+│       └── service/          # CarCallAnalysisService
+├── krl-web/
+│   └── src/main/
+│       ├── java/tech/waitforu/krlweb/
+│       │   ├── controller/   # /api/config /api/analysis /api/analysis/excel
+│       │   ├── config/       # ConfigStorageService
+│       │   └── service/      # CallGraphExcelExportService
+│       └── resources/
+│           ├── application.yml
+│           └── static/       # index.html + js/app.js + css
+└── README.md
+```
 
+---
 
-## 2 文件信息栏
+## 6. 快速开始
 
-通过双击结点，可以打开该结点对应的模块中的`.src`文件的信息。包括具体路径、创建时间、修改时间。
+### 6.1 环境要求
 
-![image-20251227000119649](https://obj.waitforu.tech/imgs%2Fblog%2F2025%2F12%2F27%2F000124-16637b224e6c45404e159ad12bb75f2e.webp)
+- JDK 21
+- Maven 3.9+
 
-**3 上下文信息**
+### 6.2 本地运行（开发模式）
 
-通过右键点击结点可以看到上下文信息，比如对于P程序、车型程序，这种相对规范的调用结构，就会展示其所在Case的上下文。
+```bash
+mvn -pl krl-web spring-boot:run
+```
 
-![image-20251227000602512](https://obj.waitforu.tech/imgs%2Fblog%2F2025%2F12%2F27%2F000604-042a6ffa50a1a700f592e54decb26a17.webp)
+默认访问：`http://localhost:2026`
 
-对于繁琐混杂的轨迹调用、直接展示其对应车型程序的所有文件内容。cell程序由于没有上层，也将直接展示全部。
+### 6.3 打包
 
-![image-20251227000751340](https://obj.waitforu.tech/imgs%2Fblog%2F2025%2F12%2F27%2F000753-a28fbf58febd8a164c7931376fd00354.webp)
+```bash
+mvn clean package
+```
 
-## 4 机器人信息
+---
 
-通过点击左上角**信息**按钮，可以打开机器人相关信息。
+## 7. 使用流程
 
-![image-20251227000212843](https://obj.waitforu.tech/imgs%2Fblog%2F2025%2F12%2F27%2F000216-3904fd6ff026123b68667f50ba708f51.webp)
+1. 点击 `上传备份(.zip)`，可选择 1~N 个 zip
+2. 点击 `Config` 查看/编辑本次分析配置
+3. 点击 `开始分析` 查看图谱
+4. 在线体视图点击机器人节点进入车型视图
+5. 点击 `下载Excel` 导出本次汇总结果
 
-其显示了机器人的名字、版本、备份时间、内部的一些包(比如P网包、二代示教器包、焊接包等等)
+---
 
-![image-20251227000310503](https://obj.waitforu.tech/imgs%2Fblog%2F2025%2F12%2F27%2F000314-92aa3e71d20e150927701ab3d9657839.webp)
+## 8. 配置机制说明
 
-# 配置文件
+### 8.1 配置文件路径
 
-由于历史包袱严重，机器人内部有各种奇奇怪怪名字的程序。我们可以通过上传的另一个文件`config.yml`进行约束。比如下图中的`use_cd_params()`调用在任何一个车型程序中都出现了，该文件显然不是我们关心的东西。
+- 默认：`~/.KrlParser/Config.yml`
+- 可通过 `krl.config.path` 覆盖
 
-![image-20251227002123549](https://obj.waitforu.tech/imgs%2Fblog%2F2025%2F12%2F27%2F002125-9d824beeb87d44afffea6b446739f34c.webp)
+### 8.2 自动初始化
 
-因此可以通过编辑配置文件`config.yml`进行约束。`.yml`文件是文本格式的文件，可以直接用记事本、VsCode、NodePad等文本编辑器打开。打开后找到**invokerParseSection**区域，在其中添加不想要解析的调用即可。
+- 若目标路径无配置文件，启动时自动从内置模板复制
+- 模板来源：`krl-core/src/main/resources/config.yml`
 
-> [!IMPORTANT]
->
-> `.yml`文件是与`Python`一样的缩进敏感规范。因此务必保证`config.yml`文件的上下对齐。多敲/少敲一个空格均会导致解析错误。
+### 8.3 规则语义
 
-> [!WARNING]
->
-> - 如果要屏蔽，务必以`!`开始。比如不想解析waitSeg，就要写`!waitSeg`。如果直接写`waitSeg`表示想解析`waitSeg`。
-> - 由于kuka不区分大小写，因此我们的配置规则也设定为不区分大小写。`waitSeg`即能匹配到`WAITSEG`，也可以匹配到`waitseg`
-> - 配置文件中的规则，按照从上到下的优先级来进行执行。
+- 规则数组：`prefix` / `suffix`
+- `!xxx`：忽略（黑名单）
+- `xxx`：保留（白名单）
+- `@SKIP@`：跳过该条规则
+- 匹配大小写不敏感
 
-![image-20251227002431083](https://obj.waitforu.tech/imgs%2Fblog%2F2025%2F12%2F27%2F002432-8bfa14a8cf87ea066cd8973cc81996cf.webp)
+### 8.4 关键配置项
 
-> [!CAUTION]
->
-> 注意`prefix`和`suffix`。`prefix`代表按照开始部分匹配。`suffix`表示按照结束部分匹配。由于WaitSeg和EndSeg均以`Seg`结束，因此想要同时解决掉`waitSeg`和`endSeg`，只需要在suffix中添加`!seg`即可。
+- `robotInfo.filePath`：机器人信息 INI 文件路径
+- `fileLoadSection`：备份文件加载过滤规则
+- `carInvokerParseSection`：调用解析过滤规则
 
-# 免责声明
+---
 
-- 本软件正常运行，基于现场的备份程序是正常情况下。因此对于下面这类情况，本软件必定会出现奇怪情况🤔🤔。(下图出现原因为cell中的case 62出现了三次，因此有三条线出现。)
+## 9. API 说明
 
-![image-20251227000945531](https://obj.waitforu.tech/imgs%2Fblog%2F2025%2F12%2F27%2F000947-10a6f413c838c31fa58820b74bc8a5a8.webp)
+### 9.1 读取配置
 
-![image-20251227001150546](https://obj.waitforu.tech/imgs%2Fblog%2F2025%2F12%2F27%2F001152-7417ca9e6c5b76540f420c9ce356d1de.webp)
+- `GET /api/config`
+- 响应：
 
-- 本软件目前版本(2025-12-26，v1.0.0)暂时仅仅只能做参考，未经过充分验证，结果准确性无法保证，可能出现恶意Bug
+```json
+{
+  "configPath": "/Users/xxx/.KrlParser/Config.yml",
+  "content": "...yaml..."
+}
+```
 
-- 本软件基于本地端口号2026进行工作，请避免其他软件抢占了这个端口号。
-- 本软件运行依赖于`后台服务`，服务程序需要任务管理强制结束或通过指令来结束。在关机后，本软件后台会自动退出。重启后需要重新打开软件才能通过网页使用。
-- 本软件后台启动情况下，可直接通过url地址进行访问。url地址为:`http://localhost:2026`。
+### 9.2 分析调用关系
 
-最后，正如url地址`localhost:2026`所示，Happy new year 2026，祝大家元旦快乐！
+- `POST /api/analysis`
+- `Content-Type: multipart/form-data`
+- 字段：
+  - `files`：多个 zip（推荐）
+  - `file`：单个 zip（兼容）
+  - `configText`：前端编辑后的 YAML 文本
+- 返回：`List<RobotInfo>`
+
+### 9.3 分析并导出 Excel
+
+- `POST /api/analysis/excel`
+- 入参与分析接口一致
+- 返回：`application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`
+
+---
+
+## 10. Excel 设计说明
+
+每个机器人一个 Sheet，结构如下：
+
+1. 树形区（上半区）
+- 列顺序固定：`Cell程序 | P程序 | 车型代码 | 车型程序 | 轨迹程序`
+- 同层相邻重复值纵向合并
+- 类型按固定颜色填充
+
+2. 关系矩阵区（下半区）
+- 行 = 调用方，列 = 被调用方
+- 若存在直接调用，在交叉单元格填入调用方名称
+- 同列顶部到首次直调单元格之间用 `↑` 指示
+
+---
+
+## 11. 常见问题
+
+### 11.1 为什么“下载Excel”按钮不可点击？
+
+前端按钮启用条件为：
+- 已选择至少一个 zip
+- 配置已成功加载（`/api/config` 成功）
+
+若按钮灰色：
+- 检查是否已上传 zip
+- 检查后端是否正常启动、`/api/config` 是否返回成功
+- 修改 JS 后请强制刷新浏览器缓存（`Ctrl/Cmd + Shift + R`）
+
+### 11.2 配置编辑是长期生效还是临时生效？
+
+- 弹窗内“应用到本次分析”：临时生效（通过 `configText` 传给后端）
+- 想长期生效：直接编辑磁盘文件 `~/.KrlParser/Config.yml`
+
+### 11.3 日志在哪里？
+
+默认日志目录：`~/.KrlParser/logs`
+
+---
+
+## 12. 开发建议
+
+- 新增节点类型时，需同步更新：
+  - 后端 `NodeType` 与 Excel 样式映射
+  - 前端节点样式与筛选面板
+- 调整配置规则时，优先通过 `Config` 弹窗快速验证
+- 若要扩展导出格式，可在 `CallGraphExcelExportService` 基础上新增策略类
+
+---
+
+## 13. 免责声明
+
+- 解析结果依赖备份完整性与程序规范程度
+- 若现场程序包含非常规写法（重复 Case、动态拼接调用等），结果可能存在偏差
+- 建议将本工具输出作为工程分析辅助依据，并结合现场逻辑复核

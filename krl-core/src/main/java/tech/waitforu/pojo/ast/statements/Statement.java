@@ -5,37 +5,72 @@ import tech.waitforu.pojo.ast.AstNode;
 import java.util.List;
 
 /**
- * ClassName: statements.ast.pojo.tech.waitforu.Statement
- * Package: tech.waitforu.pojo.ast
- * Description: 语句接口，定义了语句的基本属性和方法
- * Author: LiuKe
- * Create: 2025/12/12 15:08
- * Version 1.0
+ * 语句节点接口。
+ * <p>
+ * 定义语句类型与子语句管理能力。
  */
 public interface Statement extends AstNode{
     List<Statement> statementList = List.of(); //子语句列表
 
-    // 获取语句类型
-    tech.waitforu.pojo.ast.statements.StatementType getStatementType();
+    /**
+     * 获取语句类型。
+     *
+     * @return 语句类型
+     */
+    StatementType getStatementType();
 
-    // 获取所有子语句所使用的类型
-    List<tech.waitforu.pojo.ast.statements.StatementType> getChildStatementTypes();
+    /**
+     * 获取子语句出现的类型集合。
+     *
+     * @return 子语句类型列表
+     */
+    List<StatementType> getChildStatementTypes();
 
-    // 获取所有子语句
+    /**
+     * 获取全部子语句。
+     *
+     * @return 子语句列表
+     */
     List<Statement> getChildStatement();
 
-    // 获取指定类型的子语句
-    List<Statement> getChildStatement(tech.waitforu.pojo.ast.statements.StatementType statementType);
+    /**
+     * 获取指定类型子语句。
+     *
+     * @param statementType 语句类型
+     * @return 子语句列表
+     */
+    List<Statement> getChildStatement(StatementType statementType);
 
-    // 根据类型和索引获取子语句
-    Statement getChildStatement(tech.waitforu.pojo.ast.statements.StatementType statementType, int index);
+    /**
+     * 根据类型和索引获取子语句。
+     *
+     * @param statementType 语句类型
+     * @param index 类型内索引
+     * @return 匹配子语句，不存在返回 null
+     */
+    Statement getChildStatement(StatementType statementType, int index);
 
-    // 获取指定类型的第一条子语句
-    Statement getChildStatementFirst(tech.waitforu.pojo.ast.statements.StatementType statementType);
+    /**
+     * 获取指定类型第一条子语句。
+     *
+     * @param statementType 语句类型
+     * @return 第一条匹配子语句，不存在返回 null
+     */
+    Statement getChildStatementFirst(StatementType statementType);
 
-    // 添加子语句
+    /**
+     * 添加子语句。
+     *
+     * @param statement 子语句
+     * @return true 表示添加成功
+     */
     boolean addChildStatement(Statement statement);
 
-    // 删除子语句
+    /**
+     * 删除指定索引子语句。
+     *
+     * @param index 子语句索引
+     * @return 被删除语句，不存在返回 null
+     */
     Statement removeChildStatement(int index);
 }

@@ -1,12 +1,9 @@
 package tech.waitforu.pojo.ast.programunit;
 
 /**
- * ClassName: programunit.ast.pojo.tech.waitforu.Callable
- * Package: tech.waitforu.pojo.ast.programunit
- * Description: krl中可被其他模块调用的程序，包括procedure和function。
- * Author: LiuKe
- * Create: 2025/12/18 13:50
- * Version 1.0
+ * 可调用程序单元标记接口。
+ * <p>
+ * 代表可被其他模块直接调用的程序，通常为 Procedure 或 Function。
  */
 public interface Callable extends tech.waitforu.pojo.ast.programunit.ProgramUnit {
 

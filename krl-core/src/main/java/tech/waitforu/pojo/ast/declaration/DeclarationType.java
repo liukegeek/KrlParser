@@ -1,12 +1,7 @@
 package tech.waitforu.pojo.ast.declaration;
 
 /**
- * ClassName: declaration.ast.pojo.tech.waitforu.DeclarationType
- * Package: tech.waitforu.pojo.ast.declaration
- * Description:
- * Author: LiuKe
- * Create: 2025/12/15 10:04
- * Version 1.0
+ * 声明类型枚举。
  */
 public enum DeclarationType {
     Forward, //前向声明

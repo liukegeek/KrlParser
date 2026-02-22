@@ -14,15 +14,32 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Properties;
 
+/**
+ * Web 应用启动入口。
+ * <p>
+ * 主要职责：
+ * 1. 初始化日志目录；
+ * 2. 启动 Spring Boot；
+ * 3. 启动成功后自动打开浏览器；
+ * 4. 当端口被占用时，认为服务可能已在运行，直接打开已运行实例页面。
+ */
 @SpringBootApplication
 public class KrlWebApplication {
 
+    /**
+     * 类加载时优先初始化日志目录，确保日志系统拿到正确路径。
+     */
     static {
         configureLoggingDirectory();
     }
 
     private static final Logger LOGGER = LogManager.getLogger(KrlWebApplication.class);
 
+    /**
+     * 程序主入口。
+     *
+     * @param args 启动参数
+     */
     public static void main(String[] args) {
         // 确保在 Spring 启动前设置，Logback 才能读取到
         if (System.getProperty("log.dir") == null) {
@@ -65,6 +82,12 @@ public class KrlWebApplication {
     }
 
 
+    /**
+     * 配置日志目录。
+     * <p>
+     * 默认日志目录：{@code ~/.KrlParser/logs}。
+     * 若目录不存在则自动创建。
+     */
     private static void configureLoggingDirectory() {
         Path logDir;
         String configured = System.getProperty("log.dir");
@@ -94,6 +117,9 @@ public class KrlWebApplication {
 
     /**
      * 判断是否为端口占用异常
+     *
+     * @param e 待检测异常
+     * @return true 表示异常链中包含端口占用错误
      */
     private static boolean isPortInUseException(Throwable e) {
         while (e != null) {
@@ -109,6 +135,8 @@ public class KrlWebApplication {
 
     /**
      * 封装打开浏览器的逻辑
+     *
+     * @param url 目标访问地址
      */
     private static void openBrowser(String url) {
         String os = System.getProperty("os.name").toLowerCase();

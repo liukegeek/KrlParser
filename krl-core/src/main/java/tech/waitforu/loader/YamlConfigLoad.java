@@ -19,6 +19,7 @@ public class YamlConfigLoad {
 
     /**
      * 构造函数，初始化 YAML 配置加载器
+     *
      * @param configPath 配置文件的路径
      */
     public YamlConfigLoad(String configPath) {
@@ -45,6 +46,10 @@ public class YamlConfigLoad {
 
     /**
      * 将 YAML 文本解析为配置对象。
+     *
+     * @param yamlContent YAML 字符串内容
+     * @return 解析后的配置对象
+     * @throws IOException 文本为空或 YAML 语法错误时抛出
      */
     public static Config parseConfig(String yamlContent) throws IOException {
         if (yamlContent == null || yamlContent.isBlank()) {

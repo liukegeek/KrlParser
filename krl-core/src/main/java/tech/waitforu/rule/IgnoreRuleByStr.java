@@ -6,12 +6,12 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * ClassName: rule.tech.waitforu.IgnoreRuleByStr
- * Package: tech.waitforu
- * Description: 通过输入字符串判断是否符合条件，并返回true或者false
- * Author: LiuKe
- * Create: 2025/11/10 16:59
- * Version 1.0
+ * 字符串忽略规则执行器。
+ * <p>
+ * 规则约定：
+ * - 以 {@code !} 开头：命中后返回“忽略”；
+ * - 不以 {@code !} 开头：命中后返回“不忽略”；
+ * - {@code @SKIP@}：跳过该规则项。
  */
 public class IgnoreRuleByStr {
 
@@ -20,13 +20,25 @@ public class IgnoreRuleByStr {
     // 后缀列表，以!开头的路径代表忽略，其他路径代表选择
     private final List<String> suffix;
 
+    /**
+     * 使用配置构造规则执行器。
+     *
+     * @param strRuleConfig 规则配置
+     */
     public IgnoreRuleByStr(StrRuleConfig strRuleConfig) {
         prefix = strRuleConfig.getPrefix().stream().map(String::toUpperCase).toList();
         suffix = strRuleConfig.getSuffix().stream().map(String::toUpperCase).toList();
     }
 
 
-    //true代表跳过，false代表选择
+    /**
+     * 判断字符串是否应被忽略。
+     * <p>
+     * 执行顺序：先前缀后后缀，按配置列表顺序短路返回。
+     *
+     * @param str 待判断字符串
+     * @return true=忽略；false=保留
+     */
     public boolean isIgnore(String str) {
 
         //转换为大写，便于比较

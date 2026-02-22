@@ -1,12 +1,11 @@
 package tech.waitforu.pojo.carcallgraph;
 
 /**
- * ClassName: carcallgraph.pojo.tech.waitforu.CarReferenceNode
- * Package: tech.waitforu.pojo.carcallgraph
- * Description: 车型调用接口
- * Author: LiuKe
- * Create: 2025/12/17 16:25
- * Version 1.0
+ * 调用关系图节点标记接口。
+ * <p>
+ * 作为统一父类型，便于同一 children 列表中同时容纳：
+ * - 通用调用节点 {@link CallNode}
+ * - 扩展节点（如 {@link CarCode}）
  */
 public interface CarReferenceNode {
 }
