@@ -58,7 +58,8 @@ const dom = {
 
 const nodeTypeGroups = [
     {label: 'Cell', types: ['CEll']},
-    {label: 'P程序', types: ['P_PROGRAM', 'VIRTUAL']},
+    {label: 'P程序', types: ['P_PROGRAM']},
+    {label: '虚拟节点', types: ['VIRTUAL']},
     {label: '车型代码', types: ['CAR_CODE']},
     {label: '车型程序', types: ['CAR_PROGRAM']},
     {label: '轨迹程序', types: ['ROUTE_PROCESS']}
@@ -267,9 +268,9 @@ function initCy(elements, layoutName = 'dagre') {
                     'shadow-opacity': 1
                 }
             },
-            // 2. P 程序 / 车型程序 / 轨迹程序 / 虚拟节点: 圆角矩形，蓝色
+            // 2. P 程序 / 车型程序 / 轨迹程序: 圆角矩形，蓝色
             {
-                selector: 'node[type="P_PROGRAM"], node[type="VIRTUAL"], node[type="CAR_PROGRAM"], node[type="ROUTE_PROCESS"], node[type="SRC"]',
+                selector: 'node[type="P_PROGRAM"], node[type="CAR_PROGRAM"], node[type="ROUTE_PROCESS"], node[type="SRC"]',
                 style: {
                     'shape': 'round-rectangle',
                     'background-color': '#3b82f6',
@@ -278,7 +279,24 @@ function initCy(elements, layoutName = 'dagre') {
                     'corner-radius': '10px'
                 }
             },
-            // 3. DAT / 系统文件: 灰蓝色
+            // 3. VIRTUAL: 透明背景 + 虚线边框（用于区分虚拟节点）
+            {
+                selector: 'node[type="VIRTUAL"]',
+                style: {
+                    'shape': 'round-rectangle',
+                    'background-color': '#ffffff',
+                    'background-opacity': 0,
+                    'width': '120px',
+                    'height': '44px',
+                    'corner-radius': '10px',
+                    'border-width': 2,
+                    'border-style': 'dashed',
+                    'border-color': '#64748b',
+                    'color': '#334155',
+                    'text-outline-width': 0
+                }
+            },
+            // 4. DAT / 系统文件: 灰蓝色
             {
                 selector: 'node[type="DAT"], node[type="SYSTEM"]',
                 style: {
@@ -289,7 +307,7 @@ function initCy(elements, layoutName = 'dagre') {
                     'corner-radius': '10px'
                 }
             },
-            // 4. 线体视图的机器人节点: 大椭圆，深色
+            // 5. 线体视图的机器人节点: 大椭圆，深色
             {
                 selector: 'node[type="ROBOT_ROOT"]',
                 style: {
@@ -335,6 +353,15 @@ function initCy(elements, layoutName = 'dagre') {
                 selector: 'node[type="CEll"].highlighted, node[type="CAR_CODE"].highlighted',
                 style: {
                     'background-color': '#c2410c'
+                }
+            },
+            {
+                selector: 'node[type="VIRTUAL"].highlighted',
+                style: {
+                    'background-color': '#ffffff',
+                    'background-opacity': 0,
+                    'border-color': '#1e293b',
+                    'color': '#1e293b'
                 }
             },
             // 变暗 (非相关节点)

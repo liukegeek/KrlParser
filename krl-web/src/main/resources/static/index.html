@@ -163,10 +163,18 @@
             <div class="flex items-center gap-2">
                 <button type="button"
                         class=" node-type-button text-slate-600 hover:text-[#66ccff] hover:bg-blue-50 rounded px-2 py-1"
-                        data-node-types="P_PROGRAM,VIRTUAL">P程序</button>
+                        data-node-types="P_PROGRAM">P程序</button>
                 <input type="range" min="0.6" max="1.6" step="0.05" value="1"
                        class="node-size-slider"
-                       data-node-types="P_PROGRAM,VIRTUAL">
+                       data-node-types="P_PROGRAM">
+            </div>
+            <div class="flex items-center gap-2">
+                <button type="button"
+                        class=" node-type-button text-slate-600 hover:text-[#66ccff] hover:bg-blue-50 rounded px-2 py-1"
+                        data-node-types="VIRTUAL">虚拟节点</button>
+                <input type="range" min="0.6" max="1.6" step="0.05" value="1"
+                       class="node-size-slider"
+                       data-node-types="VIRTUAL">
             </div>
             <div class="flex items-center gap-2">
                 <button type="button"

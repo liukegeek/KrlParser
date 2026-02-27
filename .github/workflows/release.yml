@@ -164,7 +164,10 @@ jobs:
             --dest build/dist
           
           if [[ "${{ runner.os }}" == "Windows" ]]; then
-            7z a "${APP_NAME}-${VERSION}-windows.zip" "build/dist/${APP_NAME}"
+            (
+              cd build/dist
+              7z a "../../${APP_NAME}-${VERSION}-windows.zip" "${APP_NAME}"
+            )
           else
 
             ditto -c -k --sequesterRsrc --keepParent "build/dist/${APP_NAME}.app" "${APP_NAME}-${VERSION}-macos.zip"
