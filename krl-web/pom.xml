@@ -24,6 +24,12 @@
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
 
+        <!-- 健康检查, 供反向代理和运维平台探活使用 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+
         <!-- 校验器, 用于校验请求参数 -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

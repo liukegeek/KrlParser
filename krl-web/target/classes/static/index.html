@@ -2,250 +2,257 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>KRL Parser - 机器人调用关系分析</title>
     <link rel="icon" href="favicon.ico" type="image/x-icon">
-
-    <!-- Tailwind CSS -->
     <script src="vendor/tailwindcss.js"></script>
-
-    <!-- Cytoscape.js 核心库 -->
     <script src="vendor/cytoscape.min.js"></script>
-
-    <!-- Cytoscape Dagre 布局依赖 -->
     <script src="vendor/dagre.min.js"></script>
-    <!-- Cytoscape Dagre 扩展 -->
     <script src="vendor/cytoscape-dagre.min.js"></script>
-
-    <!-- Lucide Icons -->
     <script src="vendor/lucide.js"></script>
-
     <link rel="stylesheet" href="css/styles.css">
 </head>
-<body class="h-screen w-screen overflow-hidden text-slate-700 font-sans selection:bg-blue-100">
-
-<!-- 顶部导航栏 -->
-<header class="absolute top-0 left-0 right-0 h-16 bg-white/90 backdrop-blur-md border-b border-slate-200 z-40 flex items-center justify-between px-6 shadow-sm">
-    <div class="flex items-center gap-3">
-        <div class="bg-orange-500 p-2 rounded-lg">
-            <i data-lucide="bot" class="text-white w-6 h-6"></i>
-        </div>
-        <div>
-            <h1 class="font-bold text-xl text-slate-800 tracking-tight">KRL Parser <span
-                    class="text-slate-400 font-normal text-sm ml-2">v1.0.0</span></h1>
-            <p class="text-xs text-slate-500">KUKA 机器人备份分析工具</p>
-        </div>
-    </div>
-
-    <div class="flex items-center gap-4">
-        <!-- 上传备份按钮区域 -->
-        <div class="file-input-wrapper">
-            <button id="fileUploadButton" type="button"
-                    class="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md shadow transition-colors text-sm font-medium">
-                <i data-lucide="upload-cloud" class="w-4 h-4"></i>
-                <span id="fileUploadText">上传备份 (.zip)</span>
-            </button>
-            <input type="file" id="fileUpload" accept=".zip" multiple/>
-        </div>
-
-        <button id="configButton" type="button"
-                class="flex items-center gap-2 px-4 py-2 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-md shadow-sm transition-colors text-sm font-medium">
-            <i data-lucide="file-cog" class="w-4 h-4"></i>
-            Config
-        </button>
-
-        <button id="startAnalysisBtn" type="button"
-                class="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md shadow transition-colors text-sm font-medium action-disabled"
-                disabled>
-            <i data-lucide="play" class="w-4 h-4"></i>
-            开始分析
-        </button>
-
-        <button id="downloadExcelBtn" type="button"
-                class="flex items-center gap-2 px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-md shadow transition-colors text-sm font-medium action-disabled"
-                disabled>
-            <i data-lucide="download" class="w-4 h-4"></i>
-            下载Excel
-        </button>
-    </div>
-</header>
-
-<!-- 主内容区域 -->
-<main class="relative w-full h-full pt-16 flex">
-
-    <!-- 左侧信息面板 (可折叠) -->
-    <aside id="infoSidebar"
-           class="absolute left-4 top-20 w-72 bg-white/95 backdrop-blur rounded-xl shadow-xl border border-slate-200 z-30 transform transition-transform duration-300 -translate-x-full opacity-0 pointer-events-none flex flex-col max-h-[calc(100vh-7rem)]">
-        <!-- 面板头部 -->
-        <div class="p-3 border-b border-slate-100 flex justify-between items-center bg-slate-50 rounded-t-xl">
-            <h2 class="font-semibold text-slate-800 flex items-center gap-2 text-sm">
-                <i data-lucide="info" class="w-4 h-4 text-blue-500"></i>
-                机器人详情
-            </h2>
-            <button onclick="toggleSidebar()" class="text-slate-400 hover:text-slate-600">
-                <i data-lucide="x" class="w-4 h-4"></i>
-            </button>
-        </div>
-
-        <!-- 面板内容 -->
-        <div class="p-3 overflow-y-auto space-y-4">
-            <!-- 基本信息 -->
-            <div class="space-y-2">
-                <div class="bg-blue-50 px-3 py-2 rounded-lg border border-blue-100">
-                    <span class="text-xs text-blue-500 font-bold uppercase tracking-wider">机器人名字</span>
-                    <div id="metaName" class="text-base font-bold text-slate-800 break-words">--</div>
-                </div>
-
-                <div class="grid grid-cols-2 gap-2">
-                    <div class="bg-slate-50 px-3 py-2 rounded-lg border border-slate-100">
-                        <span class="text-xs text-slate-400 uppercase">版本</span>
-                        <div id="metaVersion" class="font-mono text-xs font-medium text-slate-700">--</div>
-                    </div>
-                    <div class="bg-slate-50 px-3 py-2 rounded-lg border border-slate-100">
-                        <span class="text-xs text-slate-400 uppercase">备份时间</span>
-                        <div id="metaDate" class="font-mono text-xs font-medium text-slate-700">--</div>
-                    </div>
-                </div>
+<body>
+<div class="app-shell">
+    <header id="appHeader" class="app-header">
+        <div class="brand-block">
+            <div class="brand-icon">
+                <i data-lucide="bot" class="icon-white"></i>
             </div>
-
-            <!-- Tech Packs -->
             <div>
-                <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">已安装的包</h3>
-                <div id="techPackList" class="space-y-2">
-                    <div class="text-sm text-slate-400 italic">暂无数据</div>
+                <h1 class="brand-title">KRL Parser <span>v1.0.0</span></h1>
+                <p class="brand-subtitle">KUKA 机器人备份分析工具</p>
+            </div>
+        </div>
+
+        <div class="header-actions">
+            <button id="headerMenuToggle" type="button" class="toolbar-button secondary menu-toggle-button" aria-expanded="false" aria-controls="headerMenuPanel">
+                <i data-lucide="menu"></i>
+                <span class="menu-toggle-label">操作菜单</span>
+                <i data-lucide="chevron-down" class="menu-toggle-chevron"></i>
+            </button>
+
+            <div id="headerMenuPanel" class="header-menu-panel hidden" aria-hidden="true">
+                <div class="toolbar-block">
+                    <div class="file-input-wrapper toolbar-item toolbar-item-grow">
+                        <button id="fileUploadButton" type="button" class="toolbar-button primary wide-button">
+                            <i data-lucide="upload-cloud"></i>
+                            <span id="fileUploadText">上传备份 (.zip)</span>
+                        </button>
+                        <input type="file" id="fileUpload" accept=".zip" multiple>
+                    </div>
+
+                    <button id="configButton" type="button" class="toolbar-button secondary toolbar-item">
+                        <i data-lucide="file-cog"></i>
+                        <span>Config</span>
+                    </button>
+
+                    <button id="startAnalysisBtn" type="button" class="toolbar-button success toolbar-item action-disabled" disabled>
+                        <i data-lucide="play"></i>
+                        <span>开始分析</span>
+                    </button>
+
+                    <button id="downloadExcelBtn" type="button" class="toolbar-button warning toolbar-item action-disabled" disabled>
+                        <i data-lucide="download"></i>
+                        <span>下载Excel</span>
+                    </button>
+                </div>
+
+                <div id="statusBlock" class="status-block hidden">
+                    <span id="runtimeStatusBadge" class="status-badge neutral">Server 模式</span>
+                    <span id="taskStatusBadge" class="status-badge neutral">等待上传</span>
                 </div>
             </div>
         </div>
-    </aside>
+    </header>
 
-    <!-- 侧边栏触发按钮 (当侧边栏隐藏时显示) -->
-    <button id="sidebarTrigger" onclick="toggleSidebar()"
-            class="absolute left-4 top-20 z-20 info-trigger bg-white rounded-full shadow-md border border-slate-200 hover:bg-slate-50 transition-all hidden">
-        <i data-lucide="info" class="w-4 h-4 text-slate-600"></i>
-        信息
-    </button>
-
-    <!-- 图形画布 (Cytoscape) -->
-    <div id="cy" class="w-full h-full cursor-grab active:cursor-grabbing"></div>
-
-    <!-- 视图切换控制台 (右下角) -->
-    <div class="absolute bottom-6 right-6 z-30 bg-white/90 backdrop-blur rounded-full shadow-xl border border-slate-200 p-1.5 flex gap-1">
-        <button id="btnLineView" onclick="switchView('line')"
-                class="flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all bg-blue-600 text-white shadow-md">
-            <i data-lucide="network" class="w-4 h-4"></i>
-            线体信息
-        </button>
-        <button id="btnCarView" onclick="switchView('car')"
-                class="flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all text-slate-500 hover:bg-slate-100">
-            <i data-lucide="git-branch" class="w-4 h-4"></i>
-            车型信息
-        </button>
-    </div>
-
-    <!-- 节点调整面板 (左下角) -->
-    <div id="nodeControlPanel"
-         class="absolute bottom-6 left-6 z-20 bg-white/95 backdrop-blur border border-slate-200 p-3 rounded-xl shadow-xl text-xs space-y-3 w-64 transform transition-transform duration-300 -translate-x-full opacity-0 pointer-events-none">
-        <div class="flex items-center justify-between border-b border-slate-100 pb-2">
-            <div class="font-bold text-slate-600">节点调整</div>
-            <button id="nodeControlClose" type="button" class="text-slate-400 hover:text-slate-600">
-                <i data-lucide="x" class="w-4 h-4"></i>
-            </button>
-        </div>
-        <div class="space-y-2">
-            <div class="flex items-center gap-2">
-                <button type="button"
-                        class= " node-type-button text-slate-600 hover:text-[#66ccff] hover:bg-blue-50 rounded px-2 py-1"
-                        data-node-types="CEll">Cell</button>
-                <input type="range" min="0.6" max="1.6" step="0.05" value="1"
-                       class="node-size-slider"
-                       data-node-types="CEll">
-            </div>
-            <div class="flex items-center gap-2">
-                <button type="button"
-                        class=" node-type-button text-slate-600 hover:text-[#66ccff] hover:bg-blue-50 rounded px-2 py-1"
-                        data-node-types="P_PROGRAM,VIRTUAL">P程序</button>
-                <input type="range" min="0.6" max="1.6" step="0.05" value="1"
-                       class="node-size-slider"
-                       data-node-types="P_PROGRAM,VIRTUAL">
-            </div>
-            <div class="flex items-center gap-2">
-                <button type="button"
-                        class=" node-type-button text-slate-600 hover:text-[#66ccff] hover:bg-blue-50 rounded px-2 py-1"
-                        data-node-types="CAR_CODE">车型代码</button>
-                <input type="range" min="0.6" max="1.6" step="0.05" value="1"
-                       class="node-size-slider"
-                       data-node-types="CAR_CODE">
-            </div>
-            <div class="flex items-center gap-2">
-                <button type="button"
-                        class=" node-type-button text-slate-600 hover:text-[#66ccff] hover:bg-blue-50 rounded px-2 py-1"
-                        data-node-types="CAR_PROGRAM">车型程序</button>
-                <input type="range" min="0.6" max="1.6" step="0.05" value="1"
-                       class="node-size-slider"
-                       data-node-types="CAR_PROGRAM">
-            </div>
-            <div class="flex items-center gap-2">
-                <button type="button"
-                        class=" node-type-button text-slate-600 hover:text-[#66ccff] hover:bg-blue-50 rounded px-2 py-1"
-                        data-node-types="ROUTE_PROCESS">轨迹程序</button>
-                <input type="range" min="0.6" max="1.6" step="0.05" value="1"
-                       class="node-size-slider"
-                       data-node-types="ROUTE_PROCESS">
-            </div>
-        </div>
-        <div class="pt-2 border-t border-slate-100 text-slate-400 leading-relaxed">
-            <p>点击标签选中/取消同类节点，拖动横条调整大小</p>
-        </div>
-    </div>
-
-    <button id="nodeControlTrigger"
-            class="absolute bottom-6 left-6 z-20 info-trigger bg-white rounded-full shadow-md border border-slate-200 hover:bg-slate-50 transition-all">
-        <i data-lucide="sliders" class="w-4 h-4 text-slate-600"></i>
-        节点调整
-    </button>
-    <div id="nodePopover" class="node-popover hidden"></div>
-
-</main>
-
-<!-- 加载中遮罩 -->
-<div id="loader" class="fixed inset-0 bg-white/80 backdrop-blur-sm z-50 hidden flex-col items-center justify-center">
-    <div class="animate-spin text-blue-600 mb-4">
-        <i data-lucide="loader-2" class="w-10 h-10"></i>
-    </div>
-    <p class="text-slate-600 font-medium">正在解析 KRL 代码结构...</p>
-</div>
-
-<!-- Config 编辑弹窗 -->
-<div id="configModal" class="fixed inset-0 bg-slate-900/45 z-50 hidden items-center justify-center px-6">
-    <div class="w-full max-w-4xl bg-white rounded-xl shadow-2xl border border-slate-200 overflow-hidden">
-        <div class="px-5 py-3 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
-            <div>
-                <h3 class="text-sm font-semibold text-slate-800">Config 编辑器</h3>
-                <p class="text-xs text-slate-500 mt-1 break-all" id="configPathText">--</p>
-            </div>
-            <button id="configCloseBtn" type="button"
-                    class="text-slate-400 hover:text-slate-600 p-1 rounded">
-                <i data-lucide="x" class="w-4 h-4"></i>
-            </button>
-        </div>
-        <div class="p-5 space-y-3">
-            <p class="text-xs text-slate-500 leading-relaxed">
-                此处编辑用于本次分析（临时生效）。长期修改请直接编辑磁盘中的 Config.yml。
-            </p>
-            <textarea id="configTextarea"
-                      class="w-full h-[420px] border border-slate-200 rounded-lg p-3 font-mono text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-400 resize-y"></textarea>
-            <div class="flex items-center justify-end gap-2">
-                <button id="configReloadBtn" type="button"
-                        class="px-3 py-1.5 text-xs rounded-md border border-slate-300 bg-white hover:bg-slate-50 text-slate-700">从磁盘重载
-                </button>
-                <button id="configApplyBtn" type="button"
-                        class="px-3 py-1.5 text-xs rounded-md bg-blue-600 hover:bg-blue-700 text-white">应用到本次分析
+    <main id="mainShell" class="main-shell">
+        <aside id="infoSidebar" class="floating-panel info-panel panel-hidden" aria-hidden="true">
+            <div class="panel-header">
+                <div class="panel-title">
+                    <i data-lucide="info"></i>
+                    <span>详情信息</span>
+                </div>
+                <button id="infoSidebarClose" type="button" class="panel-close-button">
+                    <i data-lucide="x"></i>
                 </button>
             </div>
+
+            <div class="panel-section">
+                <div class="section-title">机器人信息</div>
+                <div class="info-card info-card-accent">
+                    <div class="info-label">机器人名字</div>
+                    <div id="metaName" class="info-value">--</div>
+                </div>
+                <div class="info-grid">
+                    <div class="info-card">
+                        <div class="info-label">版本</div>
+                        <div id="metaVersion" class="info-mono">--</div>
+                    </div>
+                    <div class="info-card">
+                        <div class="info-label">备份时间</div>
+                        <div id="metaDate" class="info-mono">--</div>
+                    </div>
+                </div>
+                <div class="info-card">
+                    <div class="info-label">已安装的包</div>
+                    <div id="techPackList" class="tech-pack-list">
+                        <div class="info-empty">暂无数据</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel-section">
+                <div class="section-title">节点信息</div>
+                <div id="nodeDetailEmpty" class="info-empty">点击图谱节点后在此查看详情。手机端同样通过点击节点查看。</div>
+                <div id="nodeDetailContent" class="node-detail-grid hidden">
+                    <div class="info-card info-card-accent-soft">
+                        <div class="info-label">节点名称</div>
+                        <div id="nodeName" class="info-value">--</div>
+                    </div>
+                    <div class="info-card">
+                        <div class="info-label">节点类型</div>
+                        <div id="nodeType" class="info-mono">--</div>
+                    </div>
+                    <div class="info-card">
+                        <div class="info-label">文件路径</div>
+                        <div id="nodePath" class="info-break">--</div>
+                    </div>
+                    <div class="info-grid">
+                        <div class="info-card">
+                            <div class="info-label">创建时间</div>
+                            <div id="nodeCreateTime" class="info-mono">--</div>
+                        </div>
+                        <div class="info-card">
+                            <div class="info-label">修改时间</div>
+                            <div id="nodeModifyTime" class="info-mono">--</div>
+                        </div>
+                    </div>
+                    <div class="info-card">
+                        <div class="info-label">相关信息</div>
+                        <pre id="nodeRelevantInfo" class="node-relevant-info">--</pre>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <button id="sidebarTrigger" type="button" class="floating-trigger hidden">
+            <i data-lucide="info"></i>
+            <span>信息</span>
+        </button>
+
+        <div id="canvasShell" class="canvas-shell">
+            <div id="cy" class="canvas-view"></div>
+            <div id="listView" class="list-view hidden"></div>
+        </div>
+
+        <div id="renderModeSwitcher" class="floating-switch render-mode-switch hidden">
+            <button id="btnGraphMode" type="button" class="switch-button active">
+                <i data-lucide="workflow"></i>
+                <span>图谱视图</span>
+            </button>
+            <button id="btnListMode" type="button" class="switch-button">
+                <i data-lucide="list"></i>
+                <span>列表视图</span>
+            </button>
+        </div>
+
+        <div id="viewSwitcher" class="floating-switch view-mode-switch">
+            <button id="btnLineView" type="button" class="switch-button active">
+                <i data-lucide="network"></i>
+                <span>线体信息</span>
+            </button>
+            <button id="btnCarView" type="button" class="switch-button">
+                <i data-lucide="git-branch"></i>
+                <span>车型信息</span>
+            </button>
+        </div>
+
+        <div id="nodeControlPanel" class="floating-panel node-control-panel panel-hidden" aria-hidden="true">
+            <div class="panel-header">
+                <div class="panel-title">
+                    <i data-lucide="sliders-horizontal"></i>
+                    <span>节点调整</span>
+                </div>
+                <button id="nodeControlClose" type="button" class="panel-close-button">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+            <div class="node-control-body">
+                <div class="node-control-row">
+                    <button type="button" class="node-type-button" data-node-types="CEll">Cell</button>
+                    <input type="range" min="0.6" max="1.8" step="0.05" value="1" class="node-size-slider" data-node-types="CEll">
+                </div>
+                <div class="node-control-row">
+                    <button type="button" class="node-type-button" data-node-types="P_PROGRAM">P程序</button>
+                    <input type="range" min="0.6" max="1.8" step="0.05" value="1" class="node-size-slider" data-node-types="P_PROGRAM">
+                </div>
+                <div class="node-control-row">
+                    <button type="button" class="node-type-button" data-node-types="VIRTUAL">虚拟节点</button>
+                    <input type="range" min="0.6" max="1.8" step="0.05" value="1" class="node-size-slider" data-node-types="VIRTUAL">
+                </div>
+                <div class="node-control-row">
+                    <button type="button" class="node-type-button" data-node-types="CAR_CODE">车型代码</button>
+                    <input type="range" min="0.6" max="1.8" step="0.05" value="1" class="node-size-slider" data-node-types="CAR_CODE">
+                </div>
+                <div class="node-control-row">
+                    <button type="button" class="node-type-button" data-node-types="CAR_PROGRAM">车型程序</button>
+                    <input type="range" min="0.6" max="1.8" step="0.05" value="1" class="node-size-slider" data-node-types="CAR_PROGRAM">
+                </div>
+                <div class="node-control-row">
+                    <button type="button" class="node-type-button" data-node-types="ROUTE_PROCESS">轨迹程序</button>
+                    <input type="range" min="0.6" max="1.8" step="0.05" value="1" class="node-size-slider" data-node-types="ROUTE_PROCESS">
+                </div>
+            </div>
+            <div class="panel-tip">点击标签高亮节点类型，拖动滑块调整该类型节点尺寸。</div>
+        </div>
+
+        <button id="nodeControlTrigger" type="button" class="floating-trigger">
+            <i data-lucide="sliders-horizontal"></i>
+            <span>节点调整</span>
+        </button>
+
+        <div id="nodePopover" class="node-popover hidden"></div>
+    </main>
+
+    <div id="loader" class="overlay hidden">
+        <div class="overlay-card">
+            <div class="overlay-icon">
+                <i data-lucide="loader-2"></i>
+            </div>
+            <div id="loaderText" class="overlay-text">正在初始化...</div>
+        </div>
+    </div>
+
+    <div id="configModal" class="modal hidden">
+        <div class="modal-card config-modal-card">
+            <div class="panel-header">
+                <div class="panel-title">
+                    <i data-lucide="file-cog"></i>
+                    <span>Config 编辑器</span>
+                </div>
+                <button id="configCloseBtn" type="button" class="panel-close-button">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="modal-hint">此处编辑仅对本次分析生效。长期配置请直接修改磁盘中的 <code>Config.yml</code>。</div>
+                <div id="configPathText" class="modal-path">--</div>
+                <textarea id="configTextarea" class="config-textarea"></textarea>
+                <div class="modal-actions">
+                    <button id="configReloadBtn" type="button" class="toolbar-button secondary small-button">
+                        <i data-lucide="refresh-ccw"></i>
+                        <span>从磁盘重新加载</span>
+                    </button>
+                    <button id="configApplyBtn" type="button" class="toolbar-button primary small-button">
+                        <i data-lucide="check"></i>
+                        <span>应用到本次分析</span>
+                    </button>
+                </div>
+            </div>
         </div>
     </div>
 </div>
-
 <script src="js/app.js"></script>
 </body>
 </html>

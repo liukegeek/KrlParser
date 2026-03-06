@@ -72,12 +72,14 @@
                     <configuration>
                         <release>${maven.compiler.release}</release>
                         <encoding>${project.build.sourceEncoding}</encoding>
+                        <parameters>true</parameters>
                     </configuration>
                 </plugin>
 
                 <plugin>
                     <groupId>org.springframework.boot</groupId>
                     <artifactId>spring-boot-maven-plugin</artifactId>
+                    <version>${spring-boot.version}</version>
                     <configuration>
                         <!-- 如果你有多个 @SpringBootApplication，显式指定主类；否则可省略 -->
 <!--                        <mainClass>tech.waitforu.krlweb.KrlWebApplication</mainClass>-->

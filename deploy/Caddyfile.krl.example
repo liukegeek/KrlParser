@@ -1,0 +1,6 @@
+# 将以下片段追加到服务器现有 Caddyfile 中。
+# 当前服务器 caddy 容器所在 Docker network 已确认是 blog-backend-net。
+
+krl.waitforu.tech {
+    reverse_proxy krl-parser:2026
+}

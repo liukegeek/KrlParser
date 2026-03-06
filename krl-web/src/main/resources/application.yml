@@ -1,33 +1,49 @@
 server:
-  port: 2026
+  address: ${SERVER_ADDRESS:127.0.0.1}
+  port: ${SERVER_PORT:2026}
 
 spring:
   mvc:
-    # 如果你把前端静态文件放在 resources/static 下，这个保持默认即可
     static-path-pattern: "/**"
   application:
-    name: krl-web  # 对应spring.application.name
+    name: krl-web
   servlet:
     multipart:
-      max-file-size: 1000MB    # 单个文件最大大小
-      max-request-size: 1000MB # 单次请求最大大小（包含所有文件）
+      max-file-size: ${KRL_MAX_FILE_SIZE:1000MB}
+      max-request-size: ${KRL_MAX_REQUEST_SIZE:1000MB}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
 
 logging:
-  # Boot logging defaults; custom logback-spring.xml can override file/rolling settings.
-  # logging.level.* still maps to runtime log levels.
   file:
-    # 设定默认日志存储的目录和文件名。当logback-spring.xml中未指定日志文件路径时，使用此配置。
-    name: logs/krl-analysis.log
+    name: ${KRL_LOG_DIR:${user.home}/.KrlParser/logs}/krl-analysis.log
   logback:
     rollingpolicy:
-      # 设置日志保留策略，防止磁盘满
       max-file-size: 10MB
       max-history: 7
   level:
     root: INFO
-    # 如果你想看更详细的 Spring 启动过程，可以设为 DEBUG
     org.springframework: INFO
 
 krl:
+  runtime:
+    mode: ${KRL_RUNTIME_MODE:desktop}
+  log:
+    dir: ${KRL_LOG_DIR:${user.home}/.KrlParser/logs}
   config:
-    path: ${user.home}/.KrlParser/Config.yml
+    path: ${KRL_CONFIG_PATH:${user.home}/.KrlParser/Config.yml}
+  storage:
+    temp-dir: ${KRL_STORAGE_TEMP_DIR:${user.home}/.KrlParser/tmp}
+    result-dir: ${KRL_STORAGE_RESULT_DIR:${user.home}/.KrlParser/results}
+    task-retention: ${KRL_TASK_RETENTION:PT12H}
+    cleanup-interval: ${KRL_CLEANUP_INTERVAL:PT30M}
+  analysis:
+    max-concurrent-tasks: ${KRL_MAX_CONCURRENT_TASKS:1}
+    max-active-tasks: ${KRL_MAX_ACTIVE_TASKS:2}

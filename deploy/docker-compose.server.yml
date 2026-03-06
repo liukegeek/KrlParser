@@ -1,0 +1,29 @@
+services:
+  krl-parser:
+    container_name: krl-parser
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    environment:
+      KRL_RUNTIME_MODE: server
+      SERVER_ADDRESS: 0.0.0.0
+      SERVER_PORT: 2026
+      KRL_CONFIG_PATH: /app/data/Config.yml
+      KRL_LOG_DIR: /app/data/logs
+      KRL_STORAGE_TEMP_DIR: /app/data/tmp
+      KRL_STORAGE_RESULT_DIR: /app/data/results
+      KRL_TASK_RETENTION: ${KRL_TASK_RETENTION:-PT12H}
+      KRL_CLEANUP_INTERVAL: ${KRL_CLEANUP_INTERVAL:-PT30M}
+      KRL_MAX_FILE_SIZE: ${KRL_MAX_FILE_SIZE:-1000MB}
+      KRL_MAX_REQUEST_SIZE: ${KRL_MAX_REQUEST_SIZE:-1000MB}
+      KRL_MAX_CONCURRENT_TASKS: ${KRL_MAX_CONCURRENT_TASKS:-1}
+      KRL_MAX_ACTIVE_TASKS: ${KRL_MAX_ACTIVE_TASKS:-2}
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
+    networks:
+      - blog-backend-net
+
+networks:
+  blog-backend-net:
+    external: true

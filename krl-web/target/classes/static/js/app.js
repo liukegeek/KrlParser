@@ -1,59 +1,97 @@
-// 初始化图标
+/*
+ * KRL Parser 前端入口。
+ *
+ * 该文件同时负责：
+ * 1. 运行模式状态管理；
+ * 2. 异步分析任务提交与轮询；
+ * 3. Cytoscape 图谱渲染；
+ * 4. 响应式桌面/移动端布局切换；
+ * 5. Config 在线编辑与 Excel 下载。
+ */
+
 lucide.createIcons();
 
-// -------------------------------------------------------------------------
-// 关键修复：显式注册 Dagre 插件
-// -------------------------------------------------------------------------
 try {
     if (typeof cytoscapeDagre !== 'undefined') {
         cytoscape.use(cytoscapeDagre);
-        console.log("Cytoscape dagre extension registered.");
-    } else {
-        console.warn("Cytoscape dagre extension global variable not found.");
     }
-} catch (e) {
-    console.error("Error registering dagre extension:", e);
+} catch (error) {
+    console.error('Cytoscape Dagre 插件注册失败', error);
 }
 
-// 全局状态
 let cy = null;
-let currentView = 'line'; // 'line' | 'car'
-let parsedRobots = []; // 存储解析后的 RobotInfo 列表
+let currentView = 'line';
+let currentRenderMode = 'graph';
 let selectedRobotIndex = 0;
-let uploadState = {
+let parsedRobots = [];
+let popoverDragState = null;
+let tapTimer = null;
+let activeTask = null;
+let taskPollTimer = null;
+let headerMenuOpen = false;
+
+const runtimeState = {
+    runtimeMode: 'desktop',
+    analysisMode: 'sync'
+};
+
+const uploadState = {
     zipFiles: [],
     configPath: '',
     configContent: '',
-    configLoaded: false
+    configLoaded: false,
+    lastSuccessfulTaskId: null,
+    lastSuccessfulSignature: null
 };
 
-// DOM 元素引用
 const dom = {
+    appHeader: document.getElementById('appHeader'),
+    mainShell: document.getElementById('mainShell'),
     cy: document.getElementById('cy'),
-    infoSidebar: document.getElementById('infoSidebar'),
-    sidebarTrigger: document.getElementById('sidebarTrigger'),
-    metaName: document.getElementById('metaName'),
-    metaVersion: document.getElementById('metaVersion'),
-    metaDate: document.getElementById('metaDate'),
-    techPackList: document.getElementById('techPackList'),
-    btnLineView: document.getElementById('btnLineView'),
-    btnCarView: document.getElementById('btnCarView'),
-    loader: document.getElementById('loader'),
+    listView: document.getElementById('listView'),
     fileUploadButton: document.getElementById('fileUploadButton'),
+    fileUpload: document.getElementById('fileUpload'),
     fileUploadText: document.getElementById('fileUploadText'),
+    headerMenuToggle: document.getElementById('headerMenuToggle'),
+    headerMenuPanel: document.getElementById('headerMenuPanel'),
     configButton: document.getElementById('configButton'),
+    startAnalysisBtn: document.getElementById('startAnalysisBtn'),
+    downloadExcelBtn: document.getElementById('downloadExcelBtn'),
+    statusBlock: document.getElementById('statusBlock'),
+    runtimeStatusBadge: document.getElementById('runtimeStatusBadge'),
+    taskStatusBadge: document.getElementById('taskStatusBadge'),
+    loader: document.getElementById('loader'),
+    loaderText: document.getElementById('loaderText'),
     configModal: document.getElementById('configModal'),
     configCloseBtn: document.getElementById('configCloseBtn'),
     configReloadBtn: document.getElementById('configReloadBtn'),
     configApplyBtn: document.getElementById('configApplyBtn'),
     configTextarea: document.getElementById('configTextarea'),
     configPathText: document.getElementById('configPathText'),
-    startAnalysisBtn: document.getElementById('startAnalysisBtn'),
-    downloadExcelBtn: document.getElementById('downloadExcelBtn'),
-    nodePopover: document.getElementById('nodePopover'),
+    infoSidebar: document.getElementById('infoSidebar'),
+    infoSidebarClose: document.getElementById('infoSidebarClose'),
+    sidebarTrigger: document.getElementById('sidebarTrigger'),
+    metaName: document.getElementById('metaName'),
+    metaVersion: document.getElementById('metaVersion'),
+    metaDate: document.getElementById('metaDate'),
+    techPackList: document.getElementById('techPackList'),
+    nodeDetailEmpty: document.getElementById('nodeDetailEmpty'),
+    nodeDetailContent: document.getElementById('nodeDetailContent'),
+    nodeName: document.getElementById('nodeName'),
+    nodeType: document.getElementById('nodeType'),
+    nodePath: document.getElementById('nodePath'),
+    nodeCreateTime: document.getElementById('nodeCreateTime'),
+    nodeModifyTime: document.getElementById('nodeModifyTime'),
+    nodeRelevantInfo: document.getElementById('nodeRelevantInfo'),
+    btnLineView: document.getElementById('btnLineView'),
+    btnCarView: document.getElementById('btnCarView'),
+    renderModeSwitcher: document.getElementById('renderModeSwitcher'),
+    btnGraphMode: document.getElementById('btnGraphMode'),
+    btnListMode: document.getElementById('btnListMode'),
     nodeControlPanel: document.getElementById('nodeControlPanel'),
     nodeControlTrigger: document.getElementById('nodeControlTrigger'),
-    nodeControlClose: document.getElementById('nodeControlClose')
+    nodeControlClose: document.getElementById('nodeControlClose'),
+    nodePopover: document.getElementById('nodePopover')
 };
 
 const nodeTypeGroups = [
@@ -66,20 +104,64 @@ const nodeTypeGroups = [
 ];
 
 const nodeTypeBaseSizes = {
-    CEll: {width: 82, height: 82, fontSize: 12, textMaxWidth: 90},
-    CAR_CODE: {width: 82, height: 82, fontSize: 12, textMaxWidth: 90},
-    P_PROGRAM: {width: 120, height: 44, fontSize: 12, textMaxWidth: 100},
-    VIRTUAL: {width: 120, height: 44, fontSize: 12, textMaxWidth: 100},
-    CAR_PROGRAM: {width: 120, height: 44, fontSize: 12, textMaxWidth: 100},
-    ROUTE_PROCESS: {width: 120, height: 44, fontSize: 12, textMaxWidth: 100}
+    CEll: {width: 86, height: 86, fontSize: 12, textMaxWidth: 96},
+    CAR_CODE: {width: 86, height: 86, fontSize: 12, textMaxWidth: 96},
+    P_PROGRAM: {width: 128, height: 48, fontSize: 12, textMaxWidth: 108},
+    VIRTUAL: {width: 128, height: 48, fontSize: 12, textMaxWidth: 108},
+    CAR_PROGRAM: {width: 128, height: 48, fontSize: 12, textMaxWidth: 108},
+    ROUTE_PROCESS: {width: 128, height: 48, fontSize: 12, textMaxWidth: 108},
+    ROBOT_ROOT: {width: 132, height: 86, fontSize: 14, textMaxWidth: 120}
 };
 
 const nodeTypeScale = new Map();
 const activeTypeSelections = new Set();
-let popoverDragState = null;
-let lastNodeDoubleClickAt = 0;
-let tapTimer = null;
 
+/**
+ * 判断当前是否为移动端宽度。
+ *
+ * @returns {boolean} true 表示当前处于小屏布局
+ */
+function isMobileViewport() {
+    return window.matchMedia('(max-width: 768px)').matches;
+}
+
+/**
+ * 根据头部真实高度更新主区域偏移，避免响应式换行后内容被遮挡。
+ */
+function updateLayoutMetrics() {
+    const headerHeight = dom.appHeader ? dom.appHeader.offsetHeight : 112;
+    document.documentElement.style.setProperty('--header-height', `${headerHeight}px`);
+}
+
+/**
+ * 设置顶部操作菜单显隐。
+ *
+ * @param {boolean} open true 表示展开
+ */
+function setHeaderMenuOpen(open) {
+    headerMenuOpen = Boolean(open);
+    if (dom.headerMenuPanel) {
+        dom.headerMenuPanel.classList.toggle('hidden', !headerMenuOpen);
+        dom.headerMenuPanel.setAttribute('aria-hidden', String(!headerMenuOpen));
+    }
+    if (dom.headerMenuToggle) {
+        dom.headerMenuToggle.classList.toggle('active', headerMenuOpen);
+        dom.headerMenuToggle.setAttribute('aria-expanded', String(headerMenuOpen));
+    }
+}
+
+/**
+ * 切换顶部操作菜单显隐。
+ */
+function toggleHeaderMenu() {
+    setHeaderMenuOpen(!headerMenuOpen);
+}
+
+/**
+ * 获取当前选中的机器人。
+ *
+ * @returns {object|null} 当前机器人对象
+ */
 function getSelectedRobot() {
     if (!Array.isArray(parsedRobots) || parsedRobots.length === 0) {
         return null;
@@ -90,543 +172,305 @@ function getSelectedRobot() {
     return parsedRobots[selectedRobotIndex];
 }
 
-function hideNodePopover() {
-    if (dom.nodePopover) {
-        dom.nodePopover.classList.add('hidden');
-        dom.nodePopover.classList.remove('node-popover-resizable');
-    }
-}
-
-function createPopoverRow(label, value) {
-    const wrapper = document.createElement('div');
-    wrapper.className = 'flex flex-col gap-1';
-    const title = document.createElement('span');
-    title.className = 'text-slate-400';
-    title.textContent = label;
-    const content = document.createElement('div');
-    content.className = 'node-popover-content';
-    content.textContent = value || '--';
-    wrapper.appendChild(title);
-    wrapper.appendChild(content);
-    return wrapper;
-}
-
-function showNodePopover(node, side, anchorPosition) {
-    if (!dom.nodePopover) {
+/**
+ * 更新全局加载遮罩状态。
+ *
+ * @param {boolean} visible 是否显示
+ * @param {string} message  提示文案
+ */
+function setLoading(visible, message) {
+    if (!dom.loader || !dom.loaderText) {
         return;
     }
-    dom.nodePopover.innerHTML = '';
-    dom.nodePopover.classList.remove('node-popover-resizable');
-    const title = document.createElement('div');
-    title.className = 'node-popover-title';
-    title.textContent = node.data('label') || node.id();
-    dom.nodePopover.appendChild(title);
-
-    if (side === 'left') {
-        const propertyMap = node.data('propertyMap') || {};
-        dom.nodePopover.appendChild(createPopoverRow('文件路径', propertyMap.srcFilePath));
-        dom.nodePopover.appendChild(createPopoverRow('创建时间', propertyMap.createTime));
-        dom.nodePopover.appendChild(createPopoverRow('修改时间', propertyMap.modifyTime));
-    } else {
-        dom.nodePopover.classList.add('node-popover-resizable');
-        const relevantInfo = node.data('relevantInfo');
-        dom.nodePopover.appendChild(createPopoverRow('相关信息', relevantInfo || '--'));
+    if (message) {
+        dom.loaderText.textContent = message;
     }
-    const containerRect = dom.cy.getBoundingClientRect();
-    const parentRect = dom.nodePopover.offsetParent
-        ? dom.nodePopover.offsetParent.getBoundingClientRect()
-        : {left: 0, top: 0};
-    dom.nodePopover.style.left = `${containerRect.left + anchorPosition.x - parentRect.left + 16}px`;
-    dom.nodePopover.style.top = `${containerRect.top + anchorPosition.y - parentRect.top + 16}px`;
-    dom.nodePopover.classList.remove('hidden');
-
-    title.addEventListener('mousedown', (event) => {
-        event.preventDefault();
-        popoverDragState = {
-            offsetX: event.clientX - dom.nodePopover.offsetLeft,
-            offsetY: event.clientY - dom.nodePopover.offsetTop
-        };
-    });
+    dom.loader.classList.toggle('hidden', !visible);
 }
 
-document.addEventListener('mousemove', (event) => {
-    if (!popoverDragState || !dom.nodePopover) {
+/**
+ * 更新头部运行模式标签。
+ */
+function refreshRuntimeBadge() {
+    if (!dom.runtimeStatusBadge) {
         return;
     }
-    dom.nodePopover.style.left = `${event.clientX - popoverDragState.offsetX}px`;
-    dom.nodePopover.style.top = `${event.clientY - popoverDragState.offsetY}px`;
-});
+    dom.runtimeStatusBadge.className = 'status-badge';
+    dom.runtimeStatusBadge.classList.add(runtimeState.runtimeMode === 'server' ? 'info' : 'success');
+    dom.runtimeStatusBadge.textContent = runtimeState.runtimeMode === 'server' ? 'Server 模式' : 'Desktop 模式';
+}
 
-document.addEventListener('mouseup', () => {
-    popoverDragState = null;
-});
+/**
+ * 判断当前是否启用异步任务分析模式。
+ *
+ * @returns {boolean} true 表示走 `/api/analysis/tasks/**`
+ */
+function isAsyncAnalysisMode() {
+    return runtimeState.analysisMode === 'async';
+}
 
-// -------------------------------------------------------------------------
-// 核心功能：Cytoscape 初始化与配置
-// -------------------------------------------------------------------------
+/**
+ * 刷新与模式相关的界面显隐。
+ * <p>
+ * 目标是把“桌面同步模式”和“服务器异步模式”彻底隔离：
+ * 1. 桌面同步模式默认隐藏状态区；
+ * 2. 服务器异步模式展示运行模式与任务状态；
+ * 3. 由于系统已移除登录认证，因此不再展示任何登录相关控件。
+ */
+function refreshModeSpecificUi() {
+    const showRuntimeBadge = runtimeState.runtimeMode === 'server';
+    const showTaskBadge = isAsyncAnalysisMode();
+    const showStatusBlock = showRuntimeBadge || showTaskBadge;
 
-function initCy(elements, layoutName = 'dagre') {
-    if (cy) {
-        try {
-            cy.destroy(); // 销毁旧实例
-        } catch (e) {
-            console.warn("Error destroying cy instance:", e);
-        }
-        cy = null;
-        hideNodePopover();
+    if (dom.statusBlock) {
+        dom.statusBlock.classList.toggle('hidden', !showStatusBlock);
     }
-
-    // 布局配置
-    let layoutConfig;
-    if (layoutName === 'grid') {
-        // 线体信息：双列 grid 布局
-        layoutConfig = {
-            name: 'grid',
-            cols: 2, // 强制两列
-            padding: 50,
-            avoidOverlap: true
-        };
-    } else {
-        // 车型信息：Dagre 层次布局
-        // 检查 dagre 是否可用，如果不可用则回退到 breadthfirst 以防崩溃
-        const isDagreAvailable = cytoscape.extensions &&
-            cytoscape.extensions.layout &&
-            cytoscape.extensions.layout.dagre;
-
-        if (!isDagreAvailable && layoutName === 'dagre') {
-            console.error("Dagre layout not found in extensions, falling back to breadthfirst");
-            layoutName = 'breadthfirst';
-        }
-
-        if (layoutName === 'dagre') {
-            layoutConfig = {
-                name: 'dagre',
-                rankDir: 'TB', // 从上到下
-                nodeSep: 60,
-                rankSep: 110,
-                padding: 50,
-                animate: true,
-                animationDuration: 500
-            };
-        } else {
-            // Fallback
-            layoutConfig = {
-                name: 'breadthfirst',
-                directed: true,
-                padding: 50,
-                spacingFactor: 1.6,
-                animate: true,
-                animationDuration: 500
-            };
-        }
+    if (dom.runtimeStatusBadge) {
+        dom.runtimeStatusBadge.classList.toggle('hidden', !showRuntimeBadge);
     }
+    if (dom.taskStatusBadge) {
+        dom.taskStatusBadge.classList.toggle('hidden', !showTaskBadge);
+    }
+}
 
-    cy = cytoscape({
-        container: dom.cy,
-        elements: elements,
+/**
+ * 更新任务状态标签。
+ *
+ * @param {string} text 状态文案
+ * @param {string} tone 状态色调
+ */
+function setTaskBadge(text, tone = 'neutral') {
+    if (!dom.taskStatusBadge) {
+        return;
+    }
+    dom.taskStatusBadge.className = 'status-badge';
+    dom.taskStatusBadge.classList.add(tone);
+    dom.taskStatusBadge.textContent = text;
+}
 
-        // 交互设置
-        minZoom: 0.2,
-        maxZoom: 3,
-        wheelSensitivity: 0.3, // 降低滚轮灵敏度，防止一下缩放没了
+/**
+ * 刷新操作按钮状态。
+ * <p>
+ * 启动分析与 Excel 下载都依赖：
+ * 1. 已完成配置加载；
+ * 2. 至少存在一个 zip 文件；
+ * 3. 当前没有正在执行的后台任务。
+ */
+function updateActionButtons() {
+    const baseReady = uploadState.configLoaded && uploadState.zipFiles.length > 0;
+    const taskRunning = activeTask !== null;
+    const enabled = baseReady && !taskRunning;
 
-        layout: layoutConfig,
-
-        // 样式表
-        style: [
-            // ---------------- 节点基础样式 ----------------
-            {
-                selector: 'node',
-                style: {
-                    'label': 'data(label)',
-                    'text-valign': 'center',
-                    'text-halign': 'center',
-                    'color': '#ffffff',
-                    'font-size': '12px',
-                    'font-weight': 'bold',
-                    'text-outline-width': 0, // 去掉文字描边，更扁平
-                    'text-wrap': 'wrap',
-                    'text-max-width': '90px',
-                    'transition-property': 'background-color, line-color, target-arrow-color, opacity',
-                    'transition-duration': '0.3s'
-                }
-            },
-
-            // ---------------- 特定类型节点样式 (核心需求) ----------------
-            // 1. CEll / CAR_CODE: 圆形，橙色
-            {
-                selector: 'node[type="CEll"], node[type="CAR_CODE"]',
-                style: {
-                    'shape': 'ellipse',
-                    'background-color': '#f97316',
-                    'width': '82px',
-                    'height': '82px',
-                    'border-width': 4,
-                    'border-color': '#fff7ed',
-                    'shadow-blur': 12,
-                    'shadow-color': 'rgba(249, 115, 22, 0.45)',
-                    'shadow-opacity': 1
-                }
-            },
-            // 2. P 程序 / 车型程序 / 轨迹程序: 圆角矩形，蓝色
-            {
-                selector: 'node[type="P_PROGRAM"], node[type="CAR_PROGRAM"], node[type="ROUTE_PROCESS"], node[type="SRC"]',
-                style: {
-                    'shape': 'round-rectangle',
-                    'background-color': '#3b82f6',
-                    'width': '120px',
-                    'height': '44px',
-                    'corner-radius': '10px'
-                }
-            },
-            // 3. VIRTUAL: 透明背景 + 虚线边框（用于区分虚拟节点）
-            {
-                selector: 'node[type="VIRTUAL"]',
-                style: {
-                    'shape': 'round-rectangle',
-                    'background-color': '#ffffff',
-                    'background-opacity': 0,
-                    'width': '120px',
-                    'height': '44px',
-                    'corner-radius': '10px',
-                    'border-width': 2,
-                    'border-style': 'dashed',
-                    'border-color': '#64748b',
-                    'color': '#334155',
-                    'text-outline-width': 0
-                }
-            },
-            // 4. DAT / 系统文件: 灰蓝色
-            {
-                selector: 'node[type="DAT"], node[type="SYSTEM"]',
-                style: {
-                    'shape': 'round-rectangle',
-                    'background-color': '#64748b',
-                    'width': '120px',
-                    'height': '40px',
-                    'corner-radius': '10px'
-                }
-            },
-            // 5. 线体视图的机器人节点: 大椭圆，深色
-            {
-                selector: 'node[type="ROBOT_ROOT"]',
-                style: {
-                    'shape': 'ellipse',
-                    'background-color': '#ea580c',
-                    'width': '120px',
-                    'height': '80px',
-                    'font-size': '14px',
-                    'border-width': 4,
-                    'border-color': '#fff',
-                    'shadow-blur': 15,
-                    'shadow-color': 'rgba(0,0,0,0.2)'
-                }
-            },
-
-            // ---------------- 连线样式 ----------------
-            {
-                selector: 'edge',
-                style: {
-                    'width': 2,
-                    'line-color': '#94a3b8',
-                    'target-arrow-color': '#94a3b8',
-                    'target-arrow-shape': 'triangle',
-                    'curve-style': 'bezier',
-                    'arrow-scale': 1.2,
-                    'opacity': 0.85
-                }
-            },
-
-            // ---------------- 交互状态样式 ----------------
-            // 选中/高亮
-            {
-                selector: '.highlighted',
-                style: {
-                    'background-color': '#286395',
-                    'line-color': '#286395',
-                    'color': '#ffffff',
-                    'target-arrow-color': '#286395',
-                    'transition-duration': '0.1s'
-                }
-            },
-            {
-                selector: 'node[type="CEll"].highlighted, node[type="CAR_CODE"].highlighted',
-                style: {
-                    'background-color': '#c2410c'
-                }
-            },
-            {
-                selector: 'node[type="VIRTUAL"].highlighted',
-                style: {
-                    'background-color': '#ffffff',
-                    'background-opacity': 0,
-                    'border-color': '#1e293b',
-                    'color': '#1e293b'
-                }
-            },
-            // 变暗 (非相关节点)
-            {
-                selector: '.dimmed',
-                style: {
-                    'opacity': 0.1
-                }
-            }
-        ]
-    });
-
-    // 事件绑定：点击高亮逻辑
-    cy.on('tap', 'node', function (evt) {
-
-        // 1. 如果此时存在 timer，说明这是"双击"动作中的第二次点击
-        // 我们要立刻清除单击定时器，并阻止后续的单击逻辑，把舞台留给 dblclick
-        if (tapTimer) {
-            clearTimeout(tapTimer);
-            tapTimer = null;
+    [dom.startAnalysisBtn, dom.downloadExcelBtn].forEach((button) => {
+        if (!button) {
             return;
         }
-
-        const node = evt.target;
-
-        // 设置定时器，延迟200毫秒执行单击逻辑
-        tapTimer = setTimeout(() => {
-            // 如果是在线体视图，点击进入车型视图
-            if (currentView === 'line') {
-                const nextRobotIndex = Number.parseInt(node.data('robotIndex'), 10);
-                if (Number.isInteger(nextRobotIndex) && nextRobotIndex >= 0) {
-                    selectedRobotIndex = nextRobotIndex;
-                }
-                switchView('car');
-                tapTimer = null;
-                return;
-            }
-
-            // 清除之前的状态
-            cy.elements().removeClass('dimmed highlighted');
-
-            console.log("触发单击：高亮链路");
-            // 逻辑：高亮被点击节点 + 所有祖先与子孙节点（完整链路）
-            const lineage = node.predecessors().add(node).add(node.successors());
-
-            cy.elements().addClass('dimmed');
-            lineage.removeClass('dimmed').addClass('highlighted');
-            applyTypeHighlights();
-            hideNodePopover();
-            // --- 单击逻辑结束 ---
-
-            // 【核心修复】: 定时器执行完毕后，必须手动将 ID 置空！
-            // 否则下一次点击会误以为还有一个挂起的定时器而被直接 return 掉
-            tapTimer = null;
-        }, 250);
-
-
-    });
-
-    // 点击空白处恢复
-    cy.on('tap', function (evt) {
-        if (evt.target === cy) {
-            cy.elements().removeClass('dimmed highlighted');
-            applyTypeHighlights();
-            hideNodePopover();
-        }
-    });
-
-    // 双击节点：弹出弹窗，展示属性信息:文件路径、创建时间、修改时间
-    cy.on('dblclick', 'node', function (evt) {
-        // 双击保险：再次尝试清除定时器（防止极端情况）
-        if (tapTimer) {
-            clearTimeout(tapTimer);
-            tapTimer = null;
-        }
-
-
-        console.log("触发双击：属性视图");
-        lastNodeDoubleClickAt = Date.now();
-        const node = evt.target;
-        // 获取位置
-        const renderedPosition = evt.renderedPosition || node.renderedPosition();
-        const position = {
-            x: renderedPosition.x,
-            y: renderedPosition.y
-        };
-        // 显示弹窗
-        showNodePopover(node, 'left', position);
-    });
-
-    // 右键点击节点：弹出弹窗，展示调用的上下文信息
-    cy.on('cxttap', 'node', function (evt) {
-        const node = evt.target;
-        const renderedPosition = evt.renderedPosition || node.renderedPosition();
-        const position = {
-            x: renderedPosition.x,
-            y: renderedPosition.y
-        };
-        showNodePopover(node, 'right', position);
+        button.disabled = !enabled;
+        button.classList.toggle('action-disabled', !enabled);
     });
 }
 
-// -------------------------------------------------------------------------
-// 视图切换逻辑
-// -------------------------------------------------------------------------
+/**
+ * 统一封装 fetch。
+ *
+ * @param {string} url     请求地址
+ * @param {object} options fetch 参数
+ * @returns {Promise<Response>} 原始响应对象
+ */
+async function apiFetch(url, options = {}) {
+    return fetch(url, {
+        credentials: 'same-origin',
+        ...options
+    });
+}
 
-function switchView(viewName) {
-    currentView = viewName;
-
-    // UI 按钮状态切换
-    if (viewName === 'line') {
-        dom.btnLineView.classList.add('bg-blue-600', 'text-white', 'shadow-md');
-        dom.btnLineView.classList.remove('text-slate-500', 'hover:bg-slate-100');
-
-        dom.btnCarView.classList.remove('bg-blue-600', 'text-white', 'shadow-md');
-        dom.btnCarView.classList.add('text-slate-500', 'hover:bg-slate-100');
-
-        // 隐藏详情侧边栏
-        toggleSidebar(false);
-        dom.sidebarTrigger.classList.add('hidden');
-        toggleNodeControls(false);
-        if (dom.nodeControlTrigger) {
-            dom.nodeControlTrigger.classList.add('hidden');
+/**
+ * 从错误响应中提取可读消息。
+ *
+ * @param {Response} response HTTP 响应对象
+ * @returns {Promise<string>} 友好错误文案
+ */
+async function extractErrorMessage(response) {
+    let payloadText = '';
+    try {
+        payloadText = await response.text();
+    } catch (error) {
+        console.warn('读取错误响应失败', error);
+    }
+    if (!payloadText) {
+        return `HTTP ${response.status}`;
+    }
+    try {
+        const payload = JSON.parse(payloadText);
+        if (payload && payload.message) {
+            return payload.message;
         }
-        hideNodePopover();
+    } catch (_) {
+        // 非 JSON 响应直接返回原文本
+    }
+    return payloadText;
+}
 
-        renderLineGraph();
-    } else {
-        dom.btnCarView.classList.add('bg-blue-600', 'text-white', 'shadow-md');
-        dom.btnCarView.classList.remove('text-slate-500', 'hover:bg-slate-100');
+/**
+ * 计算当前输入签名，用于判断已有任务结果是否仍然对应当前上传内容。
+ *
+ * @returns {string} 当前输入签名
+ */
+function computeCurrentInputSignature() {
+    const fileSignature = uploadState.zipFiles
+        .map((file) => `${file.name}:${file.size}:${file.lastModified}`)
+        .join('|');
+    return `${fileSignature}::${uploadState.configContent || ''}`;
+}
 
-        dom.btnLineView.classList.remove('bg-blue-600', 'text-white', 'shadow-md');
-        dom.btnLineView.classList.add('text-slate-500', 'hover:bg-slate-100');
+/**
+ * 打开 Config 编辑弹窗。
+ */
+function openConfigModal() {
+    if (!dom.configModal) {
+        return;
+    }
+    dom.configTextarea.value = uploadState.configContent || '';
+    dom.configModal.classList.remove('hidden');
+}
 
-        if (parsedRobots.length > 0) {
-            toggleSidebar(false);
-            dom.sidebarTrigger.classList.remove('hidden');
-        }
-        toggleNodeControls(false);
-        if (dom.nodeControlTrigger) {
-            dom.nodeControlTrigger.classList.remove('hidden');
-        }
+/**
+ * 关闭 Config 编辑弹窗。
+ */
+function closeConfigModal() {
+    if (!dom.configModal) {
+        return;
+    }
+    dom.configModal.classList.add('hidden');
+}
 
-        renderCarGraph();
+/**
+ * 打开或关闭详情侧栏。
+ *
+ * @param {boolean} visible 是否显示
+ */
+function setSidebarVisible(visible) {
+    if (!dom.infoSidebar) {
+        return;
+    }
+    dom.infoSidebar.classList.toggle('panel-hidden', !visible);
+    dom.infoSidebar.setAttribute('aria-hidden', String(!visible));
+    if (dom.sidebarTrigger) {
+        dom.sidebarTrigger.classList.toggle('hidden', visible || currentView !== 'car' || parsedRobots.length === 0);
     }
 }
 
-// -------------------------------------------------------------------------
-// 渲染逻辑 (将数据转为 Graph)
-// -------------------------------------------------------------------------
+/**
+ * 打开或关闭节点控制面板。
+ *
+ * @param {boolean} visible 是否显示
+ */
+function setNodeControlVisible(visible) {
+    if (!dom.nodeControlPanel) {
+        return;
+    }
+    dom.nodeControlPanel.classList.toggle('panel-hidden', !visible);
+    dom.nodeControlPanel.setAttribute('aria-hidden', String(!visible));
+    if (dom.nodeControlTrigger) {
+        dom.nodeControlTrigger.classList.toggle('hidden', visible || currentView !== 'car');
+    }
+}
 
-function renderLineGraph() {
-    if (parsedRobots.length === 0) {
-        initCy([], 'grid');
+/**
+ * 清空节点详情区。
+ */
+function clearNodeDetail() {
+    if (!dom.nodeDetailEmpty || !dom.nodeDetailContent) {
+        return;
+    }
+    dom.nodeDetailEmpty.classList.remove('hidden');
+    dom.nodeDetailContent.classList.add('hidden');
+    dom.nodeName.textContent = '--';
+    dom.nodeType.textContent = '--';
+    dom.nodePath.textContent = '--';
+    dom.nodeCreateTime.textContent = '--';
+    dom.nodeModifyTime.textContent = '--';
+    dom.nodeRelevantInfo.textContent = '--';
+}
+
+/**
+ * 更新节点详情区。
+ *
+ * @param {object} nodeData 节点数据
+ */
+function updateNodeDetail(nodeData) {
+    if (!nodeData || !dom.nodeDetailEmpty || !dom.nodeDetailContent) {
+        clearNodeDetail();
+        return;
+    }
+    const propertyMap = nodeData.propertyMap || {};
+    dom.nodeDetailEmpty.classList.add('hidden');
+    dom.nodeDetailContent.classList.remove('hidden');
+    dom.nodeName.textContent = nodeData.label || nodeData.id || '--';
+    dom.nodeType.textContent = nodeData.type || '--';
+    dom.nodePath.textContent = propertyMap.srcFilePath || '--';
+    dom.nodeCreateTime.textContent = propertyMap.createTime || '--';
+    dom.nodeModifyTime.textContent = propertyMap.modifyTime || '--';
+    dom.nodeRelevantInfo.textContent = nodeData.relevantInfo || '--';
+}
+
+/**
+ * 更新机器人详情区。
+ *
+ * @param {object|null} robotData 当前机器人
+ */
+function updateRobotDetail(robotData) {
+    if (!robotData) {
+        dom.metaName.textContent = '--';
+        dom.metaVersion.textContent = '--';
+        dom.metaDate.textContent = '--';
+        dom.techPackList.innerHTML = '<div class="info-empty">暂无数据</div>';
         return;
     }
 
-    const elements = parsedRobots.map((robot, index) => ({
-        data: {
-            id: `robot_root_${index}`,
-            label: robot.robotName || robot.archiveName || `Robot ${index + 1}`,
-            type: 'ROBOT_ROOT',
-            robotIndex: index
-        }
-    }));
-
-    initCy(elements, 'grid');
-}
-
-function renderCarGraph() {
-    const selectedRobot = getSelectedRobot();
-    if (!selectedRobot) {
-        initCy([], 'dagre');
+    dom.metaName.textContent = robotData.robotName || '--';
+    dom.metaVersion.textContent = robotData.version || '--';
+    dom.metaDate.textContent = robotData.archiveDate || '--';
+    dom.techPackList.innerHTML = '';
+    const techPacks = robotData.techPacks || [];
+    if (techPacks.length === 0) {
+        dom.techPackList.innerHTML = '<div class="info-empty">暂无数据</div>';
         return;
     }
-
-    // 转换 RobotInfo 为 Cytoscape Elements
-    const elements = [];
-    const nodes = new Set();
-
-    // 1. 添加节点
-    selectedRobot.modules.forEach(mod => {
-        const nodeId = mod.name || mod.id;
-        if (!nodeId || nodes.has(nodeId)) {
-            return;
-        }
-        if (!nodes.has(nodeId)) {
-            elements.push({
-                data: {
-                    id: nodeId,
-                    label: mod.value || nodeId,
-                    type: mod.type,
-                    propertyMap: mod.propertyMap || {},
-                    relevantInfo: mod.relevantInfo || ''
-                }
-            });
-            nodes.add(nodeId);
-        }
+    techPacks.forEach((pack) => {
+        const item = document.createElement('div');
+        item.className = 'tech-pack-item';
+        item.innerHTML = `
+            <span>${escapeHtml(pack.name || '--')}</span>
+            <span class="info-mono">${escapeHtml(pack.version || '')}</span>
+        `;
+        dom.techPackList.appendChild(item);
     });
-
-    // 2. 添加边 (调用关系)
-    selectedRobot.calls.forEach((call, index) => {
-        if (!nodes.has(call.from)) {
-            elements.push({data: {id: call.from, label: call.from, type: 'SRC'}});
-            nodes.add(call.from);
-        }
-        if (!nodes.has(call.to)) {
-            elements.push({data: {id: call.to, label: call.to, type: 'SRC'}});
-            nodes.add(call.to);
-        }
-
-        elements.push({
-            data: {
-                id: `e${selectedRobotIndex}_${index}`,
-                source: call.from,
-                target: call.to
-            }
-        });
-    });
-
-    initCy(elements, 'dagre');
-    applyAllNodeTypeScales();
-    applyTypeHighlights();
-    updateSidebar(selectedRobot);
 }
 
-// -------------------------------------------------------------------------
-// 数据规范化 (后端 JSON -> 前端结构)
-// -------------------------------------------------------------------------
-
-function mapNodeType(rawType) {
-    const rawString = String(rawType || '');
-    if (rawString === 'CEll') {
-        return 'CEll';
-    }
-    const normalized = rawString.toUpperCase();
-    switch (normalized) {
-        case 'CELL':
-        case 'CELL_PROGRAM':
-        case 'CELL_PROGRAMS':
-            return 'CEll';
-        case 'CAR_CODE':
-            return 'CAR_CODE';
-        case 'P_PROGRAM':
-            return 'P_PROGRAM';
-        case 'VIRTUAL':
-            return 'VIRTUAL';
-        case 'CAR_PROGRAM':
-            return 'CAR_PROGRAM';
-        case 'ROUTE_PROCESS':
-            return 'ROUTE_PROCESS';
-        case 'DAT':
-        case 'SYSTEM':
-        case 'SRC':
-            return 'SRC';
-        default:
-            return normalized || 'SRC';
-    }
+/**
+ * 转义 HTML 文本，避免列表视图直接插值时被浏览器解析。
+ *
+ * @param {string} raw 原始文本
+ * @returns {string} 转义后的文本
+ */
+function escapeHtml(raw) {
+    return String(raw ?? '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
 }
 
+/**
+ * 规范化 Tech Pack 数据。
+ *
+ * @param {Array} rawList 原始包列表
+ * @returns {Array} 统一结构化列表
+ */
 function normalizeTechPacks(rawList) {
-    if (!Array.isArray(rawList)) {
-        return [];
-    }
-    if (rawList.length === 0) {
+    if (!Array.isArray(rawList) || rawList.length === 0) {
         return [];
     }
     if (typeof rawList[0] === 'object' && rawList[0] !== null) {
@@ -641,6 +485,48 @@ function normalizeTechPacks(rawList) {
     }));
 }
 
+/**
+ * 统一映射后端节点类型。
+ *
+ * @param {string} rawType 原始类型字符串
+ * @returns {string} 前端统一使用的节点类型
+ */
+function mapNodeType(rawType) {
+    const rawString = String(rawType || '');
+    if (rawString === 'CEll') {
+        return 'CEll';
+    }
+    const normalized = rawString.toUpperCase();
+    switch (normalized) {
+        case 'CELL':
+        case 'CELL_PROGRAM':
+        case 'CELL_PROGRAMS':
+            return 'CEll';
+        case 'P_PROGRAM':
+            return 'P_PROGRAM';
+        case 'VIRTUAL':
+            return 'VIRTUAL';
+        case 'CAR_CODE':
+            return 'CAR_CODE';
+        case 'CAR_PROGRAM':
+            return 'CAR_PROGRAM';
+        case 'ROUTE_PROCESS':
+            return 'ROUTE_PROCESS';
+        case 'DAT':
+        case 'SYSTEM':
+        case 'SRC':
+            return 'SRC';
+        default:
+            return normalized || 'SRC';
+    }
+}
+
+/**
+ * 将树结构调用图拍平为前端图谱模块/边集合。
+ *
+ * @param {object|null} rootNode 根节点
+ * @returns {{modules: Array, calls: Array}} 图谱节点与边集合
+ */
 function buildGraphFromCallNode(rootNode) {
     if (!rootNode) {
         return {modules: [], calls: []};
@@ -673,12 +559,7 @@ function buildGraphFromCallNode(rootNode) {
             if (!child || !child.id) {
                 return;
             }
-
-            calls.push({
-                from: node.id,
-                to: child.id
-            });
-
+            calls.push({from: node.id, to: child.id});
             if (!visited.has(child.id)) {
                 stack.push(child);
             }
@@ -688,23 +569,28 @@ function buildGraphFromCallNode(rootNode) {
     return {modules, calls};
 }
 
+/**
+ * 规范化单个 RobotInfo。
+ *
+ * @param {object} raw 原始后端数据
+ * @returns {object|null} 统一结构的机器人对象
+ */
 function normalizeRobotInfo(raw) {
     if (!raw || typeof raw !== 'object') {
         return null;
     }
 
     if (Array.isArray(raw.modules) && Array.isArray(raw.calls)) {
-        const modules = raw.modules.map((mod) => ({
-            ...mod,
-            name: mod.name || mod.id,
-            value: mod.value || mod.name || mod.id,
-            type: mapNodeType(mod.type || mod.nodeType),
-            propertyMap: mod.propertyMap || {},
-            relevantInfo: mod.relevantInfo || ''
-        }));
         return {
             ...raw,
-            modules,
+            modules: raw.modules.map((module) => ({
+                ...module,
+                name: module.name || module.id,
+                value: module.value || module.name || module.id,
+                type: mapNodeType(module.type || module.nodeType),
+                propertyMap: module.propertyMap || {},
+                relevantInfo: module.relevantInfo || ''
+            })),
             techPacks: normalizeTechPacks(raw.techPacks || raw.techPackList)
         };
     }
@@ -712,6 +598,7 @@ function normalizeRobotInfo(raw) {
     const graph = buildGraphFromCallNode(raw.callGraphRoot);
     return {
         robotName: raw.robotName,
+        archiveName: raw.archiveName,
         version: raw.version,
         archiveDate: raw.archiveDate,
         techPacks: normalizeTechPacks(raw.techPackList),
@@ -720,84 +607,593 @@ function normalizeRobotInfo(raw) {
     };
 }
 
+/**
+ * 规范化机器人列表。
+ *
+ * @param {Array|object} raw 原始返回值
+ * @returns {Array} 统一机器人列表
+ */
 function normalizeRobotInfoList(raw) {
     if (Array.isArray(raw)) {
-        return raw.map(item => normalizeRobotInfo(item)).filter(Boolean);
+        return raw.map(normalizeRobotInfo).filter(Boolean);
     }
-    const singleRobot = normalizeRobotInfo(raw);
-    return singleRobot ? [singleRobot] : [];
+    const single = normalizeRobotInfo(raw);
+    return single ? [single] : [];
 }
 
-// -------------------------------------------------------------------------
-// UI 辅助功能
-// -------------------------------------------------------------------------
+/**
+ * 将节点类型转成中文展示名称。
+ *
+ * @param {string} type 节点类型
+ * @returns {string} 友好文案
+ */
+function formatNodeTypeLabel(type) {
+    const found = nodeTypeGroups.find((group) => group.types.includes(type));
+    return found ? found.label : (type || '--');
+}
 
-function toggleSidebar(forceState) {
-    const isHidden = dom.infoSidebar.classList.contains('-translate-x-full');
-    const shouldShow = forceState !== undefined ? forceState : isHidden;
+/**
+ * 根据当前 renderMode 切换图谱或列表可见性。
+ */
+function applyRenderModeVisibility() {
+    const showList = currentView === 'car' && currentRenderMode === 'list';
+    dom.listView?.classList.toggle('hidden', !showList);
+    dom.cy?.classList.toggle('hidden', showList);
+    dom.renderModeSwitcher?.classList.toggle('hidden', currentView !== 'car' || !getSelectedRobot());
+    dom.btnGraphMode?.classList.toggle('active', currentRenderMode === 'graph');
+    dom.btnListMode?.classList.toggle('active', currentRenderMode === 'list');
+}
 
-    if (shouldShow) {
-        dom.infoSidebar.classList.remove('-translate-x-full', 'opacity-0', 'pointer-events-none');
-        dom.sidebarTrigger.classList.add('hidden');
-    } else {
-        dom.infoSidebar.classList.add('-translate-x-full', 'opacity-0', 'pointer-events-none');
-        dom.sidebarTrigger.classList.remove('hidden');
+/**
+ * 切换图谱/列表渲染模式。
+ *
+ * @param {'graph'|'list'} mode 目标模式
+ */
+function switchRenderMode(mode) {
+    currentRenderMode = mode;
+    applyRenderModeVisibility();
+    if (currentView === 'car' && currentRenderMode === 'list') {
+        renderListView();
+    } else if (currentView === 'car') {
+        renderCarGraph();
     }
 }
 
-function updateSidebar(data) {
-    if (!data) {
-        dom.metaName.textContent = '--';
-        dom.metaVersion.textContent = '--';
-        dom.metaDate.textContent = '--';
-        dom.techPackList.innerHTML = '<div class="text-sm text-slate-400 italic">暂无数据</div>';
+/**
+ * 切换线体/车型视图。
+ *
+ * @param {'line'|'car'} view 目标视图
+ */
+function switchView(view) {
+    if (view === 'car' && currentView === 'line' && isMobileViewport()) {
+        currentRenderMode = 'list';
+    }
+    currentView = view;
+    dom.btnLineView?.classList.toggle('active', view === 'line');
+    dom.btnCarView?.classList.toggle('active', view === 'car');
+
+    if (view === 'line') {
+        dom.renderModeSwitcher?.classList.add('hidden');
+        dom.sidebarTrigger?.classList.add('hidden');
+        setSidebarVisible(false);
+        setNodeControlVisible(false);
+        applyRenderModeVisibility();
+        renderLineGraph();
         return;
     }
 
-    dom.metaName.textContent = data.robotName || '--';
-    dom.metaVersion.textContent = data.version || '--';
-    dom.metaDate.textContent = data.archiveDate || '--';
+    if (parsedRobots.length === 0) {
+        setSidebarVisible(false);
+        setNodeControlVisible(false);
+        renderCarGraph();
+        return;
+    }
 
-    dom.techPackList.innerHTML = '';
-    if (data.techPacks && data.techPacks.length > 0) {
-        data.techPacks.forEach(pack => {
-            const div = document.createElement('div');
-            div.className = 'bg-slate-50 px-2 py-1.5 rounded border border-slate-100 text-xs flex justify-between';
-            div.innerHTML = `
-                    <span class="font-medium text-slate-700">${pack.name}</span>
-                    <span class="text-slate-400">${pack.version}</span>
-                `;
-            dom.techPackList.appendChild(div);
+    setSidebarVisible(false);
+    setNodeControlVisible(false);
+    applyRenderModeVisibility();
+    if (currentRenderMode === 'list') {
+        renderListView();
+    } else {
+        renderCarGraph();
+    }
+}
+
+/**
+ * 渲染线体视图。
+ */
+function renderLineGraph() {
+    applyRenderModeVisibility();
+    if (parsedRobots.length === 0) {
+        initCy([], 'grid');
+        return;
+    }
+
+    const elements = parsedRobots.map((robot, index) => ({
+        data: {
+            id: `robot_root_${index}`,
+            label: robot.robotName || robot.archiveName || `Robot ${index + 1}`,
+            type: 'ROBOT_ROOT',
+            robotIndex: index,
+            relevantInfo: robot.archiveName || ''
+        }
+    }));
+
+    initCy(elements, 'grid');
+    clearNodeDetail();
+}
+
+/**
+ * 渲染车型图谱视图。
+ */
+function renderCarGraph() {
+    applyRenderModeVisibility();
+    const selectedRobot = getSelectedRobot();
+    if (!selectedRobot) {
+        initCy([], 'dagre');
+        updateRobotDetail(null);
+        clearNodeDetail();
+        return;
+    }
+
+    const elements = [];
+    const nodeIds = new Set();
+
+    selectedRobot.modules.forEach((module) => {
+        const nodeId = module.name || module.id;
+        if (!nodeId || nodeIds.has(nodeId)) {
+            return;
+        }
+        nodeIds.add(nodeId);
+        elements.push({
+            data: {
+                id: nodeId,
+                label: module.value || nodeId,
+                type: module.type,
+                propertyMap: module.propertyMap || {},
+                relevantInfo: module.relevantInfo || ''
+            }
         });
-    } else {
-        dom.techPackList.innerHTML = '<div class="text-sm text-slate-400 italic">暂无数据</div>';
-    }
+    });
+
+    selectedRobot.calls.forEach((call, index) => {
+        if (!nodeIds.has(call.from)) {
+            nodeIds.add(call.from);
+            elements.push({data: {id: call.from, label: call.from, type: 'SRC'}});
+        }
+        if (!nodeIds.has(call.to)) {
+            nodeIds.add(call.to);
+            elements.push({data: {id: call.to, label: call.to, type: 'SRC'}});
+        }
+        elements.push({
+            data: {
+                id: `edge_${selectedRobotIndex}_${index}`,
+                source: call.from,
+                target: call.to
+            }
+        });
+    });
+
+    initCy(elements, 'dagre');
+    applyAllNodeTypeScales();
+    applyTypeHighlights();
+    updateRobotDetail(selectedRobot);
+    clearNodeDetail();
 }
 
-function toggleNodeControls(forceState) {
-    if (!dom.nodeControlPanel || !dom.nodeControlTrigger) {
+/**
+ * 渲染车型列表视图。
+ * <p>
+ * 手机端不适合长时间在大图上拖拽，因此这里提供结构化列表作为补充阅读模式。
+ */
+function renderListView() {
+    applyRenderModeVisibility();
+    setNodeControlVisible(false);
+    const selectedRobot = getSelectedRobot();
+    if (!selectedRobot) {
+        dom.listView.innerHTML = '<div class="list-section"><h3 class="list-section-title">暂无车型数据</h3></div>';
         return;
     }
-    const isHidden = dom.nodeControlPanel.classList.contains('-translate-x-full');
-    const shouldShow = forceState !== undefined ? forceState : isHidden;
 
-    if (shouldShow) {
-        dom.nodeControlPanel.classList.remove('-translate-x-full', 'opacity-0', 'pointer-events-none');
-        dom.nodeControlTrigger.classList.add('hidden');
+    const moduleMap = new Map(selectedRobot.modules.map((module) => [module.name || module.id, module]));
+    const groupedModules = nodeTypeGroups.map((group) => ({
+        label: group.label,
+        typeKey: group.types[0],
+        items: selectedRobot.modules.filter((module) => group.types.includes(module.type))
+    })).filter((group) => group.items.length > 0);
+
+    const summaryHtml = `
+        <div class="list-section">
+            <h3 class="list-section-title">机器人摘要</h3>
+            <div class="list-grid">
+                <div class="list-card"><strong>机器人名称</strong>${escapeHtml(selectedRobot.robotName || '--')}</div>
+                <div class="list-card"><strong>版本</strong>${escapeHtml(selectedRobot.version || '--')}</div>
+                <div class="list-card"><strong>备份时间</strong>${escapeHtml(selectedRobot.archiveDate || '--')}</div>
+                <div class="list-card"><strong>调用边数量</strong>${selectedRobot.calls.length}</div>
+            </div>
+        </div>
+    `;
+
+    const moduleHtml = groupedModules.map((group) => `
+        <div class="list-section">
+            <h3 class="list-section-title">${escapeHtml(group.label)}（${group.items.length}）</h3>
+            <div class="list-grid">
+                ${group.items.map((item) => `
+                    <div class="list-card">
+                        <strong>${escapeHtml(item.value || item.name || '--')}</strong>
+                        <div class="info-mono">${escapeHtml(item.name || '--')}</div>
+                        <div class="info-break">${escapeHtml(item.propertyMap?.srcFilePath || '无物理路径')}</div>
+                    </div>
+                `).join('')}
+            </div>
+        </div>
+    `).join('');
+
+    const callHtml = `
+        <div class="list-section">
+            <h3 class="list-section-title">直接调用关系列表</h3>
+            ${selectedRobot.calls.length === 0 ? '<div class="info-empty">暂无调用边。</div>' : selectedRobot.calls.map((call) => {
+                const fromModule = moduleMap.get(call.from) || {value: call.from, type: 'SRC'};
+                const toModule = moduleMap.get(call.to) || {value: call.to, type: 'SRC'};
+                return `
+                    <div class="list-call-item">
+                        <div class="list-call-route">
+                            <span class="call-tag type-${escapeHtml(fromModule.type || 'SRC')}">${escapeHtml(fromModule.value || call.from)}</span>
+                            <span class="info-mono">→</span>
+                            <span class="call-tag type-${escapeHtml(toModule.type || 'SRC')}">${escapeHtml(toModule.value || call.to)}</span>
+                        </div>
+                        <div class="info-break">${escapeHtml(call.from)} → ${escapeHtml(call.to)}</div>
+                    </div>
+                `;
+            }).join('')}
+        </div>
+    `;
+
+    dom.listView.innerHTML = summaryHtml + moduleHtml + callHtml;
+    updateRobotDetail(selectedRobot);
+    clearNodeDetail();
+}
+
+/**
+ * 初始化 Cytoscape 图实例。
+ *
+ * @param {Array} elements   节点与边数据
+ * @param {string} layoutName 布局算法名称
+ */
+function initCy(elements, layoutName = 'dagre') {
+    if (cy) {
+        try {
+            cy.destroy();
+        } catch (error) {
+            console.warn('销毁旧图实例失败', error);
+        }
+        cy = null;
+        hideNodePopover();
+    }
+
+    let layoutConfig;
+    if (layoutName === 'grid') {
+        layoutConfig = {
+            name: 'grid',
+            cols: isMobileViewport() ? 1 : 2,
+            padding: 60,
+            avoidOverlap: true
+        };
     } else {
-        dom.nodeControlPanel.classList.add('-translate-x-full', 'opacity-0', 'pointer-events-none');
-        dom.nodeControlTrigger.classList.remove('hidden');
+        const dagreAvailable = cytoscape.extensions && cytoscape.extensions.layout && cytoscape.extensions.layout.dagre;
+        if (layoutName === 'dagre' && dagreAvailable) {
+            layoutConfig = {
+                name: 'dagre',
+                rankDir: 'TB',
+                nodeSep: isMobileViewport() ? 38 : 56,
+                rankSep: isMobileViewport() ? 88 : 120,
+                padding: 56,
+                animate: true,
+                animationDuration: 420
+            };
+        } else {
+            layoutConfig = {
+                name: 'breadthfirst',
+                directed: true,
+                padding: 56,
+                spacingFactor: 1.5,
+                animate: true,
+                animationDuration: 420
+            };
+        }
+    }
+
+    cy = cytoscape({
+        container: dom.cy,
+        elements,
+        minZoom: 0.16,
+        maxZoom: 3,
+        wheelSensitivity: 0.25,
+        layout: layoutConfig,
+        style: [
+            {
+                selector: 'node',
+                style: {
+                    label: 'data(label)',
+                    'text-valign': 'center',
+                    'text-halign': 'center',
+                    color: '#ffffff',
+                    'font-size': '12px',
+                    'font-weight': 'bold',
+                    'text-wrap': 'wrap',
+                    'text-max-width': '96px',
+                    'text-outline-width': 0,
+                    'transition-property': 'background-color, line-color, target-arrow-color, opacity, border-color',
+                    'transition-duration': '0.2s'
+                }
+            },
+            {
+                selector: 'node[type="CEll"], node[type="CAR_CODE"]',
+                style: {
+                    shape: 'ellipse',
+                    'background-color': '#f97316',
+                    width: '86px',
+                    height: '86px',
+                    'border-width': 4,
+                    'border-color': '#fff7ed',
+                    'shadow-blur': 14,
+                    'shadow-color': 'rgba(249,115,22,0.42)',
+                    'shadow-opacity': 1
+                }
+            },
+            {
+                selector: 'node[type="P_PROGRAM"], node[type="CAR_PROGRAM"], node[type="ROUTE_PROCESS"], node[type="SRC"]',
+                style: {
+                    shape: 'round-rectangle',
+                    'background-color': '#3b82f6',
+                    width: '128px',
+                    height: '48px',
+                    'corner-radius': '12px'
+                }
+            },
+            {
+                selector: 'node[type="VIRTUAL"]',
+                style: {
+                    shape: 'round-rectangle',
+                    'background-color': '#ffffff',
+                    'background-opacity': 0,
+                    width: '128px',
+                    height: '48px',
+                    'corner-radius': '12px',
+                    'border-width': 2,
+                    'border-style': 'dashed',
+                    'border-color': '#64748b',
+                    color: '#334155'
+                }
+            },
+            {
+                selector: 'node[type="ROBOT_ROOT"]',
+                style: {
+                    shape: 'ellipse',
+                    'background-color': '#ea580c',
+                    width: '132px',
+                    height: '86px',
+                    'font-size': '14px',
+                    'border-width': 4,
+                    'border-color': '#ffffff',
+                    'shadow-blur': 16,
+                    'shadow-color': 'rgba(234,88,12,0.28)'
+                }
+            },
+            {
+                selector: 'edge',
+                style: {
+                    width: 2,
+                    'line-color': '#94a3b8',
+                    'target-arrow-color': '#94a3b8',
+                    'target-arrow-shape': 'triangle',
+                    'curve-style': 'bezier',
+                    'arrow-scale': 1.15,
+                    opacity: 0.86
+                }
+            },
+            {
+                selector: '.highlighted',
+                style: {
+                    'background-color': '#286395',
+                    'line-color': '#286395',
+                    'target-arrow-color': '#286395',
+                    color: '#ffffff'
+                }
+            },
+            {
+                selector: 'node[type="CEll"].highlighted, node[type="CAR_CODE"].highlighted',
+                style: {
+                    'background-color': '#c2410c'
+                }
+            },
+            {
+                selector: 'node[type="VIRTUAL"].highlighted',
+                style: {
+                    'background-color': '#ffffff',
+                    'background-opacity': 0,
+                    'border-color': '#1e293b',
+                    color: '#1e293b'
+                }
+            },
+            {
+                selector: '.dimmed',
+                style: {
+                    opacity: 0.12
+                }
+            }
+        ]
+    });
+
+    bindCyEvents();
+}
+
+/**
+ * 绑定 Cytoscape 交互事件。
+ * <p>
+ * 节点单击负责选中与高亮；
+ * 桌面端右键负责查看调用上下文；
+ * 长按节点则兼容移动端查看上下文信息。
+ */
+function bindCyEvents() {
+    if (!cy) {
+        return;
+    }
+
+    cy.on('tap', 'node', (event) => {
+        if (tapTimer) {
+            clearTimeout(tapTimer);
+            tapTimer = null;
+        }
+        const node = event.target;
+        tapTimer = setTimeout(() => {
+            if (currentView === 'line') {
+                const nextRobotIndex = Number.parseInt(node.data('robotIndex'), 10);
+                if (Number.isInteger(nextRobotIndex) && nextRobotIndex >= 0) {
+                    selectedRobotIndex = nextRobotIndex;
+                }
+                currentRenderMode = isMobileViewport() ? 'list' : 'graph';
+                switchView('car');
+                tapTimer = null;
+                return;
+            }
+
+            cy.elements().removeClass('dimmed highlighted');
+            const lineage = node.predecessors().add(node).add(node.successors());
+            cy.elements().addClass('dimmed');
+            lineage.removeClass('dimmed').addClass('highlighted');
+            applyTypeHighlights();
+            updateNodeDetail(node.data());
+            if (isMobileViewport()) {
+                setSidebarVisible(true);
+            }
+            tapTimer = null;
+        }, 180);
+    });
+
+    cy.on('tap', (event) => {
+        if (event.target === cy) {
+            cy.elements().removeClass('dimmed highlighted');
+            applyTypeHighlights();
+            hideNodePopover();
+            clearNodeDetail();
+        }
+    });
+
+    cy.on('cxttap', 'node', (event) => {
+        const node = event.target;
+        const renderedPosition = event.renderedPosition || node.renderedPosition();
+        showNodePopover(node, 'right', renderedPosition);
+    });
+
+    cy.on('taphold', 'node', (event) => {
+        const node = event.target;
+        const renderedPosition = event.renderedPosition || node.renderedPosition();
+        showNodePopover(node, 'left', renderedPosition);
+    });
+}
+
+/**
+ * 隐藏节点气泡提示。
+ */
+function hideNodePopover() {
+    if (dom.nodePopover) {
+        dom.nodePopover.classList.add('hidden');
     }
 }
 
-function parseNodeTypes(raw) {
-    return raw.split(',').map(type => type.trim()).filter(Boolean);
+/**
+ * 创建气泡提示中的字段块。
+ *
+ * @param {string} label 标签名
+ * @param {string} value 值
+ * @returns {HTMLElement} DOM 节点
+ */
+function createPopoverRow(label, value) {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'flex flex-col gap-1';
+    const title = document.createElement('span');
+    title.className = 'text-slate-400';
+    title.textContent = label;
+    const content = document.createElement('div');
+    content.className = 'node-popover-content';
+    content.textContent = value || '--';
+    wrapper.appendChild(title);
+    wrapper.appendChild(content);
+    return wrapper;
 }
 
+/**
+ * 显示节点气泡提示。
+ *
+ * @param {object} node            Cytoscape 节点对象
+ * @param {'left'|'right'} side    提示内容模式
+ * @param {{x:number,y:number}} anchorPosition 锚点位置
+ */
+function showNodePopover(node, side, anchorPosition) {
+    if (!dom.nodePopover) {
+        return;
+    }
+    dom.nodePopover.innerHTML = '';
+    const title = document.createElement('div');
+    title.className = 'node-popover-title';
+    title.textContent = node.data('label') || node.id();
+    dom.nodePopover.appendChild(title);
+
+    if (side === 'left') {
+        const propertyMap = node.data('propertyMap') || {};
+        dom.nodePopover.appendChild(createPopoverRow('文件路径', propertyMap.srcFilePath));
+        dom.nodePopover.appendChild(createPopoverRow('创建时间', propertyMap.createTime));
+        dom.nodePopover.appendChild(createPopoverRow('修改时间', propertyMap.modifyTime));
+    } else {
+        dom.nodePopover.appendChild(createPopoverRow('相关信息', node.data('relevantInfo') || '--'));
+    }
+
+    const containerRect = dom.cy.getBoundingClientRect();
+    const x = Math.min(containerRect.width - 280, anchorPosition.x + 16);
+    const y = Math.min(containerRect.height - 120, anchorPosition.y + 16);
+    dom.nodePopover.style.left = `${Math.max(8, x)}px`;
+    dom.nodePopover.style.top = `${Math.max(8, y)}px`;
+    dom.nodePopover.classList.remove('hidden');
+
+    title.addEventListener('mousedown', (mouseEvent) => {
+        mouseEvent.preventDefault();
+        popoverDragState = {
+            offsetX: mouseEvent.clientX - dom.nodePopover.offsetLeft,
+            offsetY: mouseEvent.clientY - dom.nodePopover.offsetTop
+        };
+    });
+}
+
+/**
+ * 解析 data-node-types 字段。
+ *
+ * @param {string} raw 原始字符串
+ * @returns {Array<string>} 类型数组
+ */
+function parseNodeTypes(raw) {
+    return String(raw || '')
+        .split(',')
+        .map((type) => type.trim())
+        .filter(Boolean);
+}
+
+/**
+ * 生成节点类型组合键。
+ *
+ * @param {Array<string>} types 类型数组
+ * @returns {string} 唯一键
+ */
 function getScaleKey(types) {
     return types.slice().sort().join('|');
 }
 
+/**
+ * 对某一组节点类型应用尺寸缩放。
+ *
+ * @param {Array<string>} types 节点类型数组
+ * @param {number} scale        缩放比例
+ */
 function applyNodeTypeScale(types, scale) {
     if (!cy) {
         return;
@@ -819,28 +1215,22 @@ function applyNodeTypeScale(types, scale) {
     });
 }
 
+/**
+ * 应用所有节点类型缩放。
+ */
 function applyAllNodeTypeScales() {
     nodeTypeGroups.forEach((group) => {
-        const key = getScaleKey(group.types);
-        const scale = nodeTypeScale.get(key) || 1;
+        const scaleKey = getScaleKey(group.types);
+        const scale = nodeTypeScale.get(scaleKey) || 1;
         applyNodeTypeScale(group.types, scale);
     });
 }
 
-function selectNodesByTypes(types) {
-    if (!cy) {
-        return;
-    }
-    cy.nodes().unselect();
-    cy.elements().removeClass('dimmed highlighted');
-    applyTypeHighlights();
-}
-
+/**
+ * 应用节点类型高亮。
+ */
 function applyTypeHighlights() {
-    if (!cy) {
-        return;
-    }
-    if (activeTypeSelections.size === 0) {
+    if (!cy || activeTypeSelections.size === 0) {
         return;
     }
     const selector = Array.from(activeTypeSelections)
@@ -852,188 +1242,227 @@ function applyTypeHighlights() {
     cy.nodes(selector).removeClass('dimmed').addClass('highlighted');
 }
 
-function initNodeControlPanel() {
-    const buttons = document.querySelectorAll('.node-type-button');
-    const sliders = document.querySelectorAll('.node-size-slider');
-
-    buttons.forEach((button) => {
+/**
+ * 初始化节点控制面板。
+ */
+function initNodeControls() {
+    document.querySelectorAll('.node-type-button').forEach((button) => {
         button.addEventListener('click', () => {
-            const types = parseNodeTypes(button.dataset.nodeTypes || '');
-            const isActive = button.classList.contains('active');
-            if (isActive) {
-                button.classList.remove('active');
-                types.forEach((type) => activeTypeSelections.delete(type));
-            } else {
-                button.classList.add('active');
-                types.forEach((type) => activeTypeSelections.add(type));
+            const types = parseNodeTypes(button.dataset.nodeTypes);
+            const active = button.classList.contains('active');
+            button.classList.toggle('active', !active);
+            types.forEach((type) => {
+                if (active) {
+                    activeTypeSelections.delete(type);
+                } else {
+                    activeTypeSelections.add(type);
+                }
+            });
+            if (cy) {
+                cy.elements().removeClass('dimmed highlighted');
+                applyTypeHighlights();
             }
-            selectNodesByTypes(types);
         });
     });
 
-    sliders.forEach((slider) => {
-        const types = parseNodeTypes(slider.dataset.nodeTypes || '');
+    document.querySelectorAll('.node-size-slider').forEach((slider) => {
+        const types = parseNodeTypes(slider.dataset.nodeTypes);
         const scaleKey = getScaleKey(types);
-        const scaleValue = Number.parseFloat(slider.value) || 1;
-        nodeTypeScale.set(scaleKey, scaleValue);
-
+        nodeTypeScale.set(scaleKey, Number.parseFloat(slider.value) || 1);
         slider.addEventListener('input', () => {
-            const newScale = Number.parseFloat(slider.value) || 1;
-            nodeTypeScale.set(scaleKey, newScale);
-            applyNodeTypeScale(types, newScale);
+            const scale = Number.parseFloat(slider.value) || 1;
+            nodeTypeScale.set(scaleKey, scale);
+            applyNodeTypeScale(types, scale);
         });
+    });
+}
+
+/**
+ * 绑定页面级交互事件。
+ */
+function bindPageEvents() {
+    if (dom.fileUploadButton) {
+        dom.fileUploadButton.addEventListener('click', () => dom.fileUpload.click());
+    }
+
+    if (dom.fileUpload) {
+        dom.fileUpload.addEventListener('change', () => {
+            const files = Array.from(dom.fileUpload.files || []);
+            const invalidFile = files.find((file) => !file.name.toLowerCase().endsWith('.zip'));
+            if (invalidFile) {
+                alert('请选择 .zip 格式的备份文件');
+                dom.fileUpload.value = '';
+                uploadState.zipFiles = [];
+                dom.fileUploadText.textContent = '上传备份 (.zip)';
+                updateActionButtons();
+                return;
+            }
+            uploadState.zipFiles = files;
+            uploadState.lastSuccessfulTaskId = null;
+            uploadState.lastSuccessfulSignature = null;
+            dom.fileUploadText.textContent = files.length === 0
+                ? '上传备份 (.zip)'
+                : files.length <= 2
+                    ? `上传备份 (.zip): ${files.map((file) => file.name).join(', ')}`
+                    : `上传备份 (.zip): 已选择 ${files.length} 个文件`;
+            setTaskBadge('输入已更新，等待分析', 'info');
+            setHeaderMenuOpen(false);
+            updateActionButtons();
+        });
+    }
+
+    dom.headerMenuToggle?.addEventListener('click', (event) => {
+        event.stopPropagation();
+        toggleHeaderMenu();
+    });
+
+    dom.configButton?.addEventListener('click', () => {
+        setHeaderMenuOpen(false);
+        openConfigModal();
+    });
+    dom.configCloseBtn?.addEventListener('click', () => closeConfigModal());
+    dom.configModal?.addEventListener('click', (event) => {
+        if (event.target === dom.configModal) {
+            closeConfigModal();
+        }
+    });
+    dom.configReloadBtn?.addEventListener('click', async () => {
+        try {
+            await loadConfigFromServer();
+            alert('已从磁盘重载配置。');
+        } catch (error) {
+            console.error(error);
+            alert(error.message || '重载配置失败');
+        }
+    });
+    dom.configApplyBtn?.addEventListener('click', () => {
+        uploadState.configContent = dom.configTextarea.value || '';
+        uploadState.lastSuccessfulTaskId = null;
+        uploadState.lastSuccessfulSignature = null;
+        closeConfigModal();
+        setTaskBadge('配置已更新，等待分析', 'info');
+        updateActionButtons();
+    });
+
+    dom.startAnalysisBtn?.addEventListener('click', () => {
+        setHeaderMenuOpen(false);
+        runAnalysisByMode();
+    });
+    dom.downloadExcelBtn?.addEventListener('click', () => {
+        setHeaderMenuOpen(false);
+        runDownloadByMode();
+    });
+    dom.btnLineView?.addEventListener('click', () => switchView('line'));
+    dom.btnCarView?.addEventListener('click', () => switchView('car'));
+    dom.btnGraphMode?.addEventListener('click', () => switchRenderMode('graph'));
+    dom.btnListMode?.addEventListener('click', () => switchRenderMode('list'));
+
+    dom.sidebarTrigger?.addEventListener('click', () => setSidebarVisible(true));
+    dom.infoSidebarClose?.addEventListener('click', () => setSidebarVisible(false));
+    dom.nodeControlTrigger?.addEventListener('click', () => setNodeControlVisible(true));
+    dom.nodeControlClose?.addEventListener('click', () => setNodeControlVisible(false));
+
+    document.addEventListener('mousemove', (event) => {
+        if (!popoverDragState || !dom.nodePopover) {
+            return;
+        }
+        dom.nodePopover.style.left = `${event.clientX - popoverDragState.offsetX}px`;
+        dom.nodePopover.style.top = `${event.clientY - popoverDragState.offsetY}px`;
+    });
+
+    document.addEventListener('mouseup', () => {
+        popoverDragState = null;
     });
 
     document.addEventListener('click', (event) => {
-        // 1. 如果弹窗本来就是关着的，不用管
+        if (headerMenuOpen
+            && dom.headerMenuPanel
+            && dom.headerMenuToggle
+            && !dom.headerMenuPanel.contains(event.target)
+            && !dom.headerMenuToggle.contains(event.target)) {
+            setHeaderMenuOpen(false);
+        }
+
         if (!dom.nodePopover || dom.nodePopover.classList.contains('hidden')) {
             return;
         }
-        // 2. 如果点击的是弹窗自己内部，不用管
         if (dom.nodePopover.contains(event.target)) {
             return;
         }
-        // 3. 【新增关键代码】如果点击的是 Cytoscape 画布区域，也不用管
-        // 因为 cy.on('tap') 会专门处理画布内的关闭逻辑，这里处理会造成冲突
-        if (dom.cy.contains(event.target)) {
+        if (dom.cy?.contains(event.target)) {
             return;
         }
         hideNodePopover();
     });
 
-    if (dom.cy) {
-        dom.cy.addEventListener('contextmenu', (event) => {
-            event.preventDefault();
-        });
-    }
-
-    if (dom.nodeControlTrigger) {
-        dom.nodeControlTrigger.addEventListener('click', () => toggleNodeControls());
-    }
-    if (dom.nodeControlClose) {
-        dom.nodeControlClose.addEventListener('click', () => toggleNodeControls(false));
-    }
-}
-
-initNodeControlPanel();
-
-// -------------------------------------------------------------------------
-// 上传处理
-// -------------------------------------------------------------------------
-
-const zipInput = document.getElementById('fileUpload');
-
-function updateStartButtonState() {
-    const canRun = uploadState.zipFiles.length > 0 && uploadState.configLoaded;
-    if (canRun) {
-        dom.startAnalysisBtn.disabled = false;
-        dom.startAnalysisBtn.classList.remove('action-disabled');
-    } else {
-        dom.startAnalysisBtn.disabled = true;
-        dom.startAnalysisBtn.classList.add('action-disabled');
-    }
-
-    if (!dom.downloadExcelBtn) {
-        return;
-    }
-    if (canRun) {
-        dom.downloadExcelBtn.disabled = false;
-        dom.downloadExcelBtn.classList.remove('action-disabled');
-    } else {
-        dom.downloadExcelBtn.disabled = true;
-        dom.downloadExcelBtn.classList.add('action-disabled');
-    }
-}
-
-function formatZipLabel(files, defaultLabel) {
-    if (!Array.isArray(files) || files.length === 0) {
-        return defaultLabel;
-    }
-    if (files.length <= 2) {
-        return `${defaultLabel}: ${files.map(file => file.name).join(', ')}`;
-    }
-    return `${defaultLabel}: 已选择 ${files.length} 个文件`;
-}
-
-function isAllowedExtension(file, allowedExtensions) {
-    const extension = file.name.split('.').pop()?.toLowerCase();
-    if (!extension) {
-        return false;
-    }
-    return allowedExtensions.includes(extension);
-}
-
-function resetInputFile(input, labelElement, defaultLabel, targetField) {
-    input.value = '';
-    labelElement.textContent = defaultLabel;
-    uploadState[targetField] = [];
-}
-
-async function extractErrorMessage(response) {
-    let payloadText = '';
-    try {
-        payloadText = await response.text();
-    } catch (error) {
-        console.warn('读取错误响应失败', error);
-    }
-    if (!payloadText) {
-        return `HTTP ${response.status}`;
-    }
-    try {
-        const payload = JSON.parse(payloadText);
-        if (payload && payload.message) {
-            return payload.message;
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') {
+            setHeaderMenuOpen(false);
         }
-    } catch (_) {
-        // ignored
+    });
+
+    if (dom.cy) {
+        dom.cy.addEventListener('contextmenu', (event) => event.preventDefault());
     }
-    return payloadText;
+
+    window.addEventListener('resize', () => {
+        updateLayoutMetrics();
+        if (headerMenuOpen) {
+            setHeaderMenuOpen(false);
+        }
+        if (currentView === 'car') {
+            if (currentRenderMode === 'list') {
+                renderListView();
+            } else {
+                renderCarGraph();
+            }
+        } else {
+            renderLineGraph();
+        }
+    });
 }
 
-function setConfigEditorContent(content) {
-    const safeContent = typeof content === 'string' ? content : '';
-    uploadState.configContent = safeContent;
-    if (dom.configTextarea) {
-        dom.configTextarea.value = safeContent;
-    }
-}
-
+/**
+ * 读取服务器上的配置文件内容。
+ */
 async function loadConfigFromServer() {
-    const response = await fetch('/api/config');
+    const response = await apiFetch('/api/config');
     if (!response.ok) {
         const message = await extractErrorMessage(response);
         throw new Error(`读取配置失败: ${message}`);
     }
     const payload = await response.json();
     uploadState.configPath = payload.configPath || '';
+    uploadState.configContent = payload.content || '';
     uploadState.configLoaded = true;
-    setConfigEditorContent(payload.content || '');
-    if (dom.configPathText) {
-        dom.configPathText.textContent = uploadState.configPath || '--';
-    }
-    updateStartButtonState();
+    dom.configPathText.textContent = uploadState.configPath || '--';
+    dom.configTextarea.value = uploadState.configContent || '';
+    updateActionButtons();
 }
 
-function openConfigModal() {
-    if (!dom.configModal) {
-        return;
+/**
+ * 查询当前运行模式状态。
+ */
+async function loadRuntimeStatus() {
+    const response = await apiFetch('/api/runtime/status');
+    if (!response.ok) {
+        const message = await extractErrorMessage(response);
+        throw new Error(`读取运行模式失败: ${message}`);
     }
-    if (dom.configTextarea) {
-        dom.configTextarea.value = uploadState.configContent || '';
-    }
-    dom.configModal.classList.remove('hidden');
-    dom.configModal.classList.add('flex');
+    const payload = await response.json();
+    runtimeState.runtimeMode = payload.runtimeMode || 'desktop';
+    runtimeState.analysisMode = payload.analysisMode || (runtimeState.runtimeMode === 'server' ? 'async' : 'sync');
+    refreshRuntimeBadge();
+    refreshModeSpecificUi();
+    updateActionButtons();
 }
 
-function closeConfigModal() {
-    if (!dom.configModal) {
-        return;
-    }
-    dom.configModal.classList.add('hidden');
-    dom.configModal.classList.remove('flex');
-}
-
-function buildAnalysisFormData() {
+/**
+ * 构造分析任务请求体。
+ *
+ * @returns {FormData} 上传表单对象
+ */
+function buildTaskFormData() {
     const formData = new FormData();
     uploadState.zipFiles.forEach((zipFile) => {
         formData.append('files', zipFile);
@@ -1042,7 +1471,12 @@ function buildAnalysisFormData() {
     return formData;
 }
 
-async function uploadAnalysis() {
+/**
+ * 提交分析任务，并在成功后刷新图谱。
+ *
+ * @param {'view'|'download'} intent 任务意图
+ */
+async function submitAsyncAnalysisTask(intent) {
     if (uploadState.zipFiles.length === 0) {
         alert('请先上传备份文件');
         return;
@@ -1052,39 +1486,98 @@ async function uploadAnalysis() {
         return;
     }
 
-    const formData = buildAnalysisFormData();
-
-    dom.loader.classList.remove('hidden');
-    dom.loader.classList.add('flex');
-
+    setLoading(true, '正在提交分析任务...');
     try {
-        const response = await fetch('/api/analysis', {
+        const response = await apiFetch('/api/analysis/tasks', {
             method: 'POST',
-            body: formData
+            body: buildTaskFormData()
         });
+        if (!response.ok) {
+            const message = await extractErrorMessage(response);
+            throw new Error(`提交任务失败: ${message}`);
+        }
+        const task = await response.json();
+        activeTask = {
+            taskId: task.taskId,
+            intent,
+            inputSignature: computeCurrentInputSignature()
+        };
+        setTaskBadge('任务已提交，等待执行', 'info');
+        updateActionButtons();
+        pollTaskUntilFinished(task.taskId, intent);
+    } catch (error) {
+        console.error(error);
+        setLoading(false, '');
+        alert(error.message || '提交分析任务失败');
+        activeTask = null;
+        updateActionButtons();
+    }
+}
 
+/**
+ * 处理 Excel 下载动作。
+ * <p>
+ * 如果当前输入已经有成功任务结果，则直接下载；
+ * 否则先提交一个新的后台任务，完成后自动下载。
+ */
+async function submitAsyncDownloadTask() {
+    const currentSignature = computeCurrentInputSignature();
+    if (uploadState.lastSuccessfulTaskId && uploadState.lastSuccessfulSignature === currentSignature) {
+        await downloadTaskExcel(uploadState.lastSuccessfulTaskId);
+        return;
+    }
+    await submitAsyncAnalysisTask('download');
+}
+
+/**
+ * 桌面同步模式下直接执行分析。
+ * <p>
+ * 这里保留原始桌面版语义：点击“开始分析”后，由当前请求直接返回图谱数据，
+ * 不引入任务 ID、任务轮询或“提交任务”的概念。
+ */
+async function submitSyncAnalysis() {
+    if (uploadState.zipFiles.length === 0) {
+        alert('请先上传备份文件');
+        return;
+    }
+    if (!uploadState.configLoaded) {
+        alert('配置尚未加载完成，请稍后重试');
+        return;
+    }
+
+    setLoading(true, '正在解析 KRL 代码结构...');
+    try {
+        const response = await apiFetch('/api/analysis', {
+            method: 'POST',
+            body: buildTaskFormData()
+        });
         if (!response.ok) {
             const message = await extractErrorMessage(response);
             throw new Error(`解析失败: ${message}`);
         }
-
         const rawData = await response.json();
         parsedRobots = normalizeRobotInfoList(rawData);
         if (parsedRobots.length === 0) {
-            throw new Error('解析失败: 返回数据格式不正确');
+            throw new Error('解析失败: 返回数据为空或格式不正确');
         }
         selectedRobotIndex = 0;
+        currentView = 'line';
+        currentRenderMode = 'graph';
         switchView('line');
     } catch (error) {
         console.error(error);
-        alert(error.message || '解析失败，请检查后端日志或接口返回。');
+        alert(error.message || '解析失败，请检查后端日志。');
     } finally {
-        dom.loader.classList.add('hidden');
-        dom.loader.classList.remove('flex');
+        setLoading(false, '');
     }
 }
 
-async function downloadAnalysisExcel() {
+/**
+ * 桌面同步模式下直接导出 Excel。
+ * <p>
+ * 行为与历史版本保持一致：每次点击都基于当前上传内容与当前配置直接生成 Excel。
+ */
+async function submitSyncDownload() {
     if (uploadState.zipFiles.length === 0) {
         alert('请先上传备份文件');
         return;
@@ -1094,21 +1587,16 @@ async function downloadAnalysisExcel() {
         return;
     }
 
-    const formData = buildAnalysisFormData();
-    dom.loader.classList.remove('hidden');
-    dom.loader.classList.add('flex');
-
+    setLoading(true, '正在生成 Excel 文件...');
     try {
-        const response = await fetch('/api/analysis/excel', {
+        const response = await apiFetch('/api/analysis/excel', {
             method: 'POST',
-            body: formData
+            body: buildTaskFormData()
         });
-
         if (!response.ok) {
             const message = await extractErrorMessage(response);
             throw new Error(`导出失败: ${message}`);
         }
-
         const blob = await response.blob();
         const downloadUrl = URL.createObjectURL(blob);
         const link = document.createElement('a');
@@ -1120,93 +1608,194 @@ async function downloadAnalysisExcel() {
         URL.revokeObjectURL(downloadUrl);
     } catch (error) {
         console.error(error);
-        alert(error.message || '导出Excel失败，请检查后端日志。');
+        alert(error.message || '导出 Excel 失败，请检查后端日志。');
     } finally {
-        dom.loader.classList.add('hidden');
-        dom.loader.classList.remove('flex');
+        setLoading(false, '');
     }
 }
 
-dom.fileUploadButton.addEventListener('click', () => {
-    zipInput.click();
-});
-
-zipInput.addEventListener('change', (e) => {
-    const files = Array.from(e.target.files || []);
-    const invalidFile = files.find(file => !isAllowedExtension(file, ['zip']));
-    if (invalidFile) {
-        alert('请选择 .zip 格式的备份文件');
-        resetInputFile(zipInput, dom.fileUploadText, '上传备份 (.zip)', 'zipFiles');
-        updateStartButtonState();
+/**
+ * 按当前模式分流“开始分析”动作。
+ */
+async function runAnalysisByMode() {
+    if (isAsyncAnalysisMode()) {
+        await submitAsyncAnalysisTask('view');
         return;
     }
-
-    uploadState.zipFiles = files;
-    dom.fileUploadText.textContent = formatZipLabel(uploadState.zipFiles, '上传备份 (.zip)');
-    updateStartButtonState();
-});
-
-if (dom.configButton) {
-    dom.configButton.addEventListener('click', () => {
-        openConfigModal();
-    });
+    await submitSyncAnalysis();
 }
 
-if (dom.configCloseBtn) {
-    dom.configCloseBtn.addEventListener('click', () => {
-        closeConfigModal();
-    });
+/**
+ * 按当前模式分流“下载 Excel”动作。
+ */
+async function runDownloadByMode() {
+    if (isAsyncAnalysisMode()) {
+        await submitAsyncDownloadTask();
+        return;
+    }
+    await submitSyncDownload();
 }
 
-if (dom.configModal) {
-    dom.configModal.addEventListener('click', (event) => {
-        if (event.target === dom.configModal) {
-            closeConfigModal();
-        }
-    });
-}
+/**
+ * 轮询任务直到结束。
+ *
+ * @param {string} taskId 任务 ID
+ * @param {'view'|'download'} intent 任务意图
+ */
+function pollTaskUntilFinished(taskId, intent) {
+    clearTimeout(taskPollTimer);
 
-if (dom.configApplyBtn) {
-    dom.configApplyBtn.addEventListener('click', () => {
-        setConfigEditorContent(dom.configTextarea ? dom.configTextarea.value : '');
-        closeConfigModal();
-    });
-}
-
-if (dom.configReloadBtn) {
-    dom.configReloadBtn.addEventListener('click', async () => {
+    const poll = async () => {
         try {
-            await loadConfigFromServer();
-            alert('已从磁盘重载配置。');
+            const response = await apiFetch(`/api/analysis/tasks/${taskId}`);
+            if (!response.ok) {
+                const message = await extractErrorMessage(response);
+                throw new Error(message);
+            }
+            const task = await response.json();
+            const status = task.status || 'PENDING';
+            const message = task.message || '任务处理中';
+
+            if (status === 'PENDING') {
+                setLoading(true, `${message}...`);
+                setTaskBadge('任务排队中', 'info');
+                taskPollTimer = setTimeout(poll, 1800);
+                return;
+            }
+            if (status === 'RUNNING') {
+                setLoading(true, `${message}...`);
+                setTaskBadge('任务执行中', 'warning');
+                taskPollTimer = setTimeout(poll, 1800);
+                return;
+            }
+            if (status === 'FAILED') {
+                setLoading(false, '');
+                setTaskBadge(message, 'error');
+                activeTask = null;
+                updateActionButtons();
+                alert(message || '任务执行失败');
+                return;
+            }
+            if (status === 'SUCCEEDED') {
+                await handleTaskSuccess(taskId, intent);
+            }
         } catch (error) {
             console.error(error);
-            alert(error.message || '重载配置失败');
+            setLoading(false, '');
+            activeTask = null;
+            updateActionButtons();
+            setTaskBadge('轮询任务失败', 'error');
+            alert(error.message || '任务轮询失败');
         }
-    });
+    };
+
+    poll();
 }
 
-dom.startAnalysisBtn.addEventListener('click', () => {
-    if (dom.startAnalysisBtn.disabled) {
-        alert('请先上传备份文件');
-        return;
+/**
+ * 处理任务成功后的图谱刷新与 Excel 下载。
+ *
+ * @param {string} taskId          任务 ID
+ * @param {'view'|'download'} intent 任务意图
+ */
+async function handleTaskSuccess(taskId, intent) {
+    setLoading(true, '正在读取分析结果...');
+    try {
+        const response = await apiFetch(`/api/analysis/tasks/${taskId}/result`);
+        if (!response.ok) {
+            const message = await extractErrorMessage(response);
+            throw new Error(message);
+        }
+        const rawData = await response.json();
+        parsedRobots = normalizeRobotInfoList(rawData);
+        selectedRobotIndex = 0;
+        currentView = 'line';
+        currentRenderMode = 'graph';
+        switchView('line');
+        uploadState.lastSuccessfulTaskId = taskId;
+        uploadState.lastSuccessfulSignature = computeCurrentInputSignature();
+        setTaskBadge('任务执行完成', 'success');
+        updateActionButtons();
+        if (intent === 'download') {
+            await downloadTaskExcel(taskId);
+        }
+    } finally {
+        setLoading(false, '');
+        activeTask = null;
+        updateActionButtons();
     }
-    uploadAnalysis();
-});
-
-if (dom.downloadExcelBtn) {
-    dom.downloadExcelBtn.addEventListener('click', () => {
-        if (dom.downloadExcelBtn.disabled) {
-            alert('请先上传备份文件');
-            return;
-        }
-        downloadAnalysisExcel();
-    });
 }
 
-switchView('line');
-loadConfigFromServer().catch((error) => {
-    console.error(error);
-    uploadState.configLoaded = false;
-    updateStartButtonState();
-    alert(error.message || '初始化配置失败，请检查后端日志。');
-});
+/**
+ * 下载指定任务的 Excel 文件。
+ *
+ * @param {string} taskId 任务 ID
+ */
+async function downloadTaskExcel(taskId) {
+    setLoading(true, '正在下载 Excel 文件...');
+    try {
+        const response = await apiFetch(`/api/analysis/tasks/${taskId}/excel`);
+        if (!response.ok) {
+            const message = await extractErrorMessage(response);
+            throw new Error(`下载失败: ${message}`);
+        }
+        const blob = await response.blob();
+        const downloadUrl = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = downloadUrl;
+        link.download = '调用关系表.xlsx';
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(downloadUrl);
+    } catch (error) {
+        console.error(error);
+        alert(error.message || '下载 Excel 失败');
+    } finally {
+        setLoading(false, '');
+    }
+}
+
+/**
+ * 初始化工作区。
+ */
+async function initializeWorkspace() {
+    await loadConfigFromServer();
+    switchView('line');
+    renderLineGraph();
+    if (isAsyncAnalysisMode()) {
+        setTaskBadge(uploadState.zipFiles.length > 0 ? '输入就绪，等待分析' : '等待上传', 'neutral');
+    }
+}
+
+/**
+ * 启动前端应用。
+ */
+async function bootstrap() {
+    updateLayoutMetrics();
+    bindPageEvents();
+    initNodeControls();
+    refreshRuntimeBadge();
+    refreshModeSpecificUi();
+    updateActionButtons();
+    clearNodeDetail();
+    if (isAsyncAnalysisMode()) {
+        setTaskBadge('正在检查运行模式', 'info');
+    }
+
+    try {
+        setLoading(true, '正在检查服务状态...');
+        await loadRuntimeStatus();
+        await initializeWorkspace();
+    } catch (error) {
+        console.error(error);
+        if (isAsyncAnalysisMode()) {
+            setTaskBadge('初始化失败', 'error');
+        }
+        alert(error.message || '初始化失败，请检查后端日志');
+    } finally {
+        setLoading(false, '');
+    }
+}
+
+bootstrap();

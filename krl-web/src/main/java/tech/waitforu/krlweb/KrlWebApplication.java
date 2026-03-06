@@ -6,31 +6,28 @@ import org.springframework.beans.factory.config.YamlPropertiesFactoryBean;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.scheduling.annotation.EnableScheduling;
+import tech.waitforu.krlweb.config.RuntimeMode;
 
-import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
+import java.util.Arrays;
 import java.util.Properties;
 
 /**
- * Web 应用启动入口。
+ * KRL Web 应用启动入口。
  * <p>
- * 主要职责：
- * 1. 初始化日志目录；
- * 2. 启动 Spring Boot；
- * 3. 启动成功后自动打开浏览器；
- * 4. 当端口被占用时，认为服务可能已在运行，直接打开已运行实例页面。
+ * 当前启动器同时兼容两种运行形态：
+ * 1. 桌面模式：保留自动打开浏览器等本机体验；
+ * 2. 服务器模式：严格按标准 Web 服务启动，不执行任何桌面行为。
  */
 @SpringBootApplication
+@EnableScheduling
 public class KrlWebApplication {
-
-    /**
-     * 类加载时优先初始化日志目录，确保日志系统拿到正确路径。
-     */
+    /** 类加载时先创建兜底日志目录，防止日志系统初始化过早。 */
     static {
-        configureLoggingDirectory();
+        configureFallbackLoggingDirectory();
     }
 
     private static final Logger LOGGER = LogManager.getLogger(KrlWebApplication.class);
@@ -41,105 +38,151 @@ public class KrlWebApplication {
      * @param args 启动参数
      */
     public static void main(String[] args) {
-        // 确保在 Spring 启动前设置，Logback 才能读取到
-        if (System.getProperty("log.dir") == null) {
-            System.setProperty("log.dir", "logs");
-        }
+        BootstrapSettings bootstrapSettings = resolveBootstrapSettings(args);
+        System.setProperty("log.dir", bootstrapSettings.logDir());
 
-        //System.getProperty 读取的是操作系统的环境变量或 JVM 启动参数。
-        //YAML 加载时机：application.yml 是由 Spring 框架加载的。在你调用 SpringApplication.run 之前，Spring 的环境还没有初始化，它根本不知道 YAML 文件的存在，更读不到里面的 port: 2026。
-        //因此在main方法中，我们需要先加载application.yml配置文件，然后从配置文件中获取"server.port"设定的端口值。
-        YamlPropertiesFactoryBean yaml = new YamlPropertiesFactoryBean();
-        yaml.setResources(new ClassPathResource("application.yml")); // 指定你的配置文件
-        Properties properties = yaml.getObject();
-        if (properties == null) {
-            LOGGER.error("无法加载application.yml配置文件");
-            System.exit(1);
-        }
-        // 如果没有从配置文件中获取到"server.port"设定的端口值，则设定port=0。当端口配置为0时，表示使用随机端口。在后续的BrowserAutoLauncher类中会对使用到的随机端口进行获取。
-        int port = properties.getProperty("server.port") != null ? Integer.parseInt(properties.getProperty("server.port")) : 0;
-        String url = "http://localhost:" + port;
+        String desktopUrl = "http://localhost:" + bootstrapSettings.port();
         try {
-            // 尝试启动 Spring 应用
             SpringApplication.run(KrlWebApplication.class, args);
-            // 如果到这里没有报错，说明后端启动成功，自动打开浏览器访问
-            openBrowser(url);
-            LOGGER.info("Krl车型调用分析程序已启动，日志目录: {}", System.getProperty("log.dir"));
-
-        } catch (Exception e) {
-            // 关键：判断异常链中是否包含端口占用异常
-            if (isPortInUseException(e)) {
-                LOGGER.info("检测到端口 {} 已被占用，可能是程序已在运行。即将直接打开浏览器访问，直接打开浏览器访问: {}", port, url);
-                openBrowser(url);
-                // 正常退出当前尝试启动的进程，因为已经有一个在运行了
-                System.exit(0);
-            } else {
-                // 如果是其他类型的错误（如代码报错），则正常打印堆栈信息
-                LOGGER.error("程序启动失败，原因: ", e);
-                throw e;
+            LOGGER.info("KRL Parser 已启动，运行模式: {}, 日志目录: {}",
+                    bootstrapSettings.runtimeMode(), bootstrapSettings.logDir());
+            if (bootstrapSettings.runtimeMode() == RuntimeMode.DESKTOP) {
+                openBrowser(desktopUrl);
             }
+        } catch (Exception exception) {
+            if (bootstrapSettings.runtimeMode() == RuntimeMode.DESKTOP && isPortInUseException(exception)) {
+                LOGGER.info("检测到端口 {} 已被占用，尝试打开已运行的桌面实例: {}",
+                        bootstrapSettings.port(), desktopUrl);
+                openBrowser(desktopUrl);
+                System.exit(0);
+                return;
+            }
+            LOGGER.error("程序启动失败", exception);
+            throw exception;
         }
     }
 
+    /**
+     * 解析启动期必须用到的基础配置。
+     * <p>
+     * 这里不能依赖 Spring Environment，因为在 `SpringApplication.run` 之前，
+     * Spring 容器尚未完成初始化。为此需要手动按“命令行参数 -> JVM 参数 -> 环境变量 -> application.yml”顺序解析。
+     *
+     * @param args 启动参数
+     * @return 启动期基础配置
+     */
+    private static BootstrapSettings resolveBootstrapSettings(String[] args) {
+        Properties yamlProperties = loadApplicationYamlProperties();
+        String runtimeModeValue = resolveBootstrapProperty(args, "krl.runtime.mode", "KRL_RUNTIME_MODE",
+                yamlProperties.getProperty("krl.runtime.mode", "desktop"));
+        String portValue = resolveBootstrapProperty(args, "server.port", "SERVER_PORT",
+                yamlProperties.getProperty("server.port", "2026"));
+        String logDir = resolveBootstrapProperty(args, "krl.log.dir", "KRL_LOG_DIR",
+                yamlProperties.getProperty("krl.log.dir",
+                        Path.of(System.getProperty("user.home", "."), ".KrlParser", "logs").toString()));
+
+        int port;
+        try {
+            port = Integer.parseInt(portValue);
+        } catch (NumberFormatException exception) {
+            port = 2026;
+        }
+        return new BootstrapSettings(RuntimeMode.from(runtimeModeValue), port,
+                Path.of(logDir).toAbsolutePath().normalize().toString());
+    }
 
     /**
-     * 配置日志目录。
-     * <p>
-     * 默认日志目录：{@code ~/.KrlParser/logs}。
-     * 若目录不存在则自动创建。
+     * 读取 `application.yml` 中的默认属性。
+     *
+     * @return YAML 转换后的属性对象
      */
-    private static void configureLoggingDirectory() {
-        Path logDir;
-        String configured = System.getProperty("log.dir");
-        if (configured != null && !configured.isBlank()) {
+    private static Properties loadApplicationYamlProperties() {
+        YamlPropertiesFactoryBean yaml = new YamlPropertiesFactoryBean();
+        yaml.setResources(new ClassPathResource("application.yml"));
+        Properties properties = yaml.getObject();
+        return properties != null ? properties : new Properties();
+    }
+
+    /**
+     * 按固定优先级解析启动属性。
+     *
+     * @param args         启动参数
+     * @param propertyName Spring 风格属性名
+     * @param envName      对应环境变量名
+     * @param defaultValue 默认值
+     * @return 解析结果
+     */
+    private static String resolveBootstrapProperty(String[] args,
+                                                   String propertyName,
+                                                   String envName,
+                                                   String defaultValue) {
+        String argumentPrefix = "--" + propertyName + "=";
+        String argumentValue = Arrays.stream(args)
+                .filter(arg -> arg.startsWith(argumentPrefix))
+                .map(arg -> arg.substring(argumentPrefix.length()))
+                .findFirst()
+                .orElse(null);
+        if (argumentValue != null && !argumentValue.isBlank()) {
+            return argumentValue;
+        }
+        String systemProperty = System.getProperty(propertyName);
+        if (systemProperty != null && !systemProperty.isBlank()) {
+            return systemProperty;
+        }
+        String envValue = System.getenv(envName);
+        if (envValue != null && !envValue.isBlank()) {
+            return envValue;
+        }
+        return defaultValue;
+    }
+
+    /**
+     * 设置兜底日志目录。
+     * <p>
+     * 若用户没有通过环境变量或 JVM 参数传入日志目录，
+     * 则默认使用 `~/.KrlParser/logs`。
+     */
+    private static void configureFallbackLoggingDirectory() {
+        if (System.getProperty("log.dir") != null && !System.getProperty("log.dir").isBlank()) {
             return;
         }
-        String userHome = System.getProperty("user.home", ".");
-        File desktopDir = new File(userHome, "Desktop");
-        //检查这个路径是否存在并且确实是一个目录
-        if (!desktopDir.exists() || !desktopDir.isDirectory()) {
-
-            // 标准桌面路径不存在，尝试使用用户主目录作为备用路径。
-            desktopDir = new File(userHome);
-
-            // 对于非标准系统（如某些Linux发行版桌面目录名可能不同），
-            // 这可能需要更复杂的逻辑，或者干脆回退到用户主目录
-        }
-        logDir = Paths.get(userHome, ".KrlParser", "logs");
+        String envLogDir = System.getenv("KRL_LOG_DIR");
+        Path logDir = envLogDir != null && !envLogDir.isBlank()
+                ? Path.of(envLogDir)
+                : Path.of(System.getProperty("user.home", "."), ".KrlParser", "logs");
         try {
             Files.createDirectories(logDir);
-            System.setProperty("log.dir", logDir.toString());
-        } catch (IOException ex) {
-            System.err.println("无法创建日志目录 " + logDir + ": " + ex.getMessage());
-            System.setProperty("log.dir", logDir.toAbsolutePath().toString());
+        } catch (IOException ignored) {
+            // 启动兜底阶段不阻断，后续仍会尝试使用该目录。
         }
+        System.setProperty("log.dir", logDir.toAbsolutePath().normalize().toString());
     }
 
     /**
-     * 判断是否为端口占用异常
+     * 判断异常链中是否包含端口占用异常。
      *
-     * @param e 待检测异常
-     * @return true 表示异常链中包含端口占用错误
+     * @param throwable 待检测异常
+     * @return true 表示端口被占用
      */
-    private static boolean isPortInUseException(Throwable e) {
-        while (e != null) {
-            // SpringBoot 端口占用通常抛出 BindException 或特定的 PortInUseException
-            if (e instanceof java.net.BindException ||
-                e.getClass().getName().contains("PortInUseException")) {
+    private static boolean isPortInUseException(Throwable throwable) {
+        Throwable current = throwable;
+        while (current != null) {
+            if (current instanceof java.net.BindException
+                    || current.getClass().getName().contains("PortInUseException")) {
                 return true;
             }
-            e = e.getCause();
+            current = current.getCause();
         }
         return false;
     }
 
     /**
-     * 封装打开浏览器的逻辑
+     * 打开系统默认浏览器。
      *
-     * @param url 目标访问地址
+     * @param url 目标地址
      */
     private static void openBrowser(String url) {
-        String os = System.getProperty("os.name").toLowerCase();
+        String os = System.getProperty("os.name", "").toLowerCase();
         Runtime runtime = Runtime.getRuntime();
         try {
             if (os.contains("win")) {
@@ -149,8 +192,18 @@ public class KrlWebApplication {
             } else {
                 runtime.exec(new String[]{"xdg-open", url});
             }
-        } catch (IOException e) {
-            LOGGER.error("自动打开浏览器失败: {}", e.getMessage());
+        } catch (IOException exception) {
+            LOGGER.error("自动打开浏览器失败: {}", exception.getMessage());
         }
+    }
+
+    /**
+     * 启动期所需配置载体。
+     *
+     * @param runtimeMode 运行模式
+     * @param port        服务端口
+     * @param logDir      日志目录
+     */
+    private record BootstrapSettings(RuntimeMode runtimeMode, int port, String logDir) {
     }
 }
