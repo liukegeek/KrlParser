@@ -1,7 +1,6 @@
 package tech.waitforu.parser;
 
-import tech.waitforu.loader.KrlZipLoader;
-import tech.waitforu.loader.YamlConfigLoad;
+import tech.waitforu.exception.KrlParseException;
 import tech.waitforu.pojo.ast.statements.CaseBlock;
 import tech.waitforu.pojo.ast.statements.ExpressionStatement;
 import tech.waitforu.pojo.ast.statements.Statement;
@@ -23,7 +22,6 @@ import tech.waitforu.pojo.krl.KrlFile;
 import tech.waitforu.pojo.krl.KrlModule;
 import tech.waitforu.rule.IgnoreRuleByStr;
 
-import java.io.IOException;
 import java.util.*;
 
 /**
@@ -69,7 +67,7 @@ public class CarCallReferenceAnalyze {
 
         //判断解析是否正确。如果不是KrlRoot节点(包括为NULL)，抛出异常。同时如果astNode是KrlRoot节点，将其转换为KrlRoot类型。
         if (!(astNode instanceof KrlRoot krlRoot)) {
-            throw new RuntimeException("解析出错，" + cellModule.getModuleName() + "模块中不存在KrlRoot节点");
+            throw new KrlParseException("解析出错，" + cellModule.getModuleName() + "模块中不存在KrlRoot节点");
         }
 
         String nodeValue = cellModule.getModuleName();
@@ -102,7 +100,7 @@ public class CarCallReferenceAnalyze {
             }
         }
         if (switchStatement == null) {
-            throw new RuntimeException("解析出错，" + cellModule.getModuleName() + "cell模块中不存在通过PGNO变量进行判断的的SWITCH语句，请确认备份和修改本程序代码");
+            throw new KrlParseException("解析出错，" + cellModule.getModuleName() + "cell模块中不存在通过PGNO变量进行判断的的SWITCH语句，请确认备份和修改本程序代码");
         }
 
         List<CaseBlock> caseBlockList = switchStatement.getCaseBlocks();
@@ -117,7 +115,7 @@ public class CarCallReferenceAnalyze {
                             childStatement ->
                             {
                                 if (!(childStatement instanceof ExpressionStatement expressionStatement)) {
-                                    throw new RuntimeException("解析出错，" + cellModule.getModuleName() + "模块中的CASE块中未找到表达式语句");
+                                    throw new KrlParseException("解析出错，" + cellModule.getModuleName() + "模块中的CASE块中未找到表达式语句");
                                 }
                                 Expression expression = expressionStatement.getExpression();
                                 if (expression instanceof Invocation invocation) {
@@ -164,7 +162,7 @@ public class CarCallReferenceAnalyze {
         AstNode astNode = moduleParser.getSrcAst();
         //判断解析是否正确。如果不是KrlRoot节点(包括为NULL)，抛出异常。同时如果astNode是KrlRoot节点，将其转换为KrlRoot类型。
         if (!(astNode instanceof KrlRoot krlRoot)) {
-            throw new RuntimeException("解析出错，" + pProgramModule.getModuleName() + "模块中不存在KrlRoot节点");
+            throw new KrlParseException("解析出错，" + pProgramModule.getModuleName() + "模块中不存在KrlRoot节点");
         }
 
         String nodeValue = pProgramModule.getModuleName();
@@ -187,7 +185,9 @@ public class CarCallReferenceAnalyze {
         // 每个模块只有一个与调用目标名称匹配的程序单元,因此可以直接获取第一个匹配项。
         ProgramUnit callProgramUnit = krlRoot.findNodesByType(ProgramUnit.class).stream()
                 .filter(programUnit -> programUnit.getName().equalsIgnoreCase(callableName))
-                .toList().getFirst();
+                .findFirst()
+                .orElseThrow(() -> new KrlParseException("解析出错，" + pProgramModule.getModuleName()
+                        + "模块中未找到程序单元: " + callableName));
 
         List<VariableExpression> variableExpressionList = callProgramUnit.findNodesByType(VariableExpression.class);
         //用于判断是该程序是P程序，还是直接调用的车型程序！
@@ -243,7 +243,7 @@ public class CarCallReferenceAnalyze {
             }
             // 判断是否存在SWITCH语句，且其匹配表达式为"GIPGNO2"
             if (switchStatement == null) {
-                throw new RuntimeException("解析出错，" + pProgramModule.getModuleName() + "模块中未找到用于匹配`GIPGNO2`变量的SWITCH语句");
+                throw new KrlParseException("解析出错，" + pProgramModule.getModuleName() + "模块中未找到用于匹配`GIPGNO2`变量的SWITCH语句");
             }
 
             List<CaseBlock> caseBlockList = switchStatement.getCaseBlocks();
@@ -257,7 +257,7 @@ public class CarCallReferenceAnalyze {
                                 childStatement ->
                                 {
                                     if (!(childStatement instanceof ExpressionStatement expressionStatement)) {
-                                        throw new RuntimeException("解析出错，" + pProgramModule.getModuleName() + "模块中的CASE块中未找到表达式语句");
+                                        throw new KrlParseException("解析出错，" + pProgramModule.getModuleName() + "模块中的CASE块中未找到表达式语句");
                                     }
                                     Expression expression = expressionStatement.getExpression();
                                     if (expression instanceof Invocation invocation) {
@@ -344,7 +344,7 @@ public class CarCallReferenceAnalyze {
         AstNode astNode = moduleParser.getSrcAst();
         //判断解析是否正确。如果不是KrlRoot节点(包括为NULL)，抛出异常。同时如果astNode是KrlRoot节点，将其转换为KrlRoot类型。
         if (!(astNode instanceof KrlRoot krlRoot)) {
-            throw new RuntimeException("解析出错，" + carProgramModule.getModuleName() + "模块中不存在KrlRoot节点");
+            throw new KrlParseException("解析出错，" + carProgramModule.getModuleName() + "模块中不存在KrlRoot节点");
         }
 
         String nodeValue = carProgramModule.getModuleName();
@@ -364,7 +364,9 @@ public class CarCallReferenceAnalyze {
         // 每个模块只有一个与调用目标名称匹配的程序单元,因此可以直接获取第一个匹配项。
         ProgramUnit callProgramUnit = krlRoot.getBody().getProgramUnitList().stream()
                 .filter(programUnit -> programUnit.getName().equalsIgnoreCase(callableName))
-                .toList().getFirst();
+                .findFirst()
+                .orElseThrow(() -> new KrlParseException("解析出错，" + carProgramModule.getModuleName()
+                        + "模块中未找到程序单元: " + callableName));
 
         List<Invocation> invocationList = callProgramUnit.findNodesByType(Invocation.class);
 
@@ -382,7 +384,11 @@ public class CarCallReferenceAnalyze {
                         String routeNodeId = routNodeType + ":" + routeNodeValue;
                         CallNode routeProcessNode = new CallNode(routeNodeId, routeNodeValue, routNodeType, null);
                         //设置结点的补充信息,关于模块文件的。
-                        this.setPropertyAboutFile(routeProcessNode, moduleRepository.findByCallableName(targetName));
+                        KrlModule routeModule = moduleRepository.findByCallableName(targetName);
+                        if (routeModule == null) {
+                            throw new KrlParseException("解析出错，未找到轨迹程序对应模块: " + targetName);
+                        }
+                        this.setPropertyAboutFile(routeProcessNode, routeModule);
                         // 轨迹相关上下文信息来源于当前调用表达式所在根语句文本。
                         String routeNodeRelevantInfo = invocation.findRootNode().getTextContent();
                         routeProcessNode.setRelevantInfo(routeNodeRelevantInfo);
@@ -426,6 +432,9 @@ public class CarCallReferenceAnalyze {
             carCode.addProperty("createTime", "虚构结点，不存在文件创建时间"); //创建时间
             carCode.addProperty("modifyTime", "虚构结点，不存在文件修改时间"); //修改时间
         } else {
+            if (krlModule == null || krlModule.getModuleSrcFile() == null) {
+                throw new KrlParseException("解析出错，节点缺少对应的模块文件信息: " + callNode.getValue());
+            }
             //设置补充信息。
             callNode.addProperty("srcFilePath", krlModule.getModuleSrcFile().getPath()); //文件路径
             callNode.addProperty("createTime", krlModule.getModuleSrcFile().getCreateTime()); //创建时间

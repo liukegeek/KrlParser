@@ -15,6 +15,7 @@ import org.apache.poi.xssf.usermodel.XSSFCellStyle;
 import org.apache.poi.xssf.usermodel.XSSFColor;
 import org.apache.poi.xssf.usermodel.XSSFFont;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import tech.waitforu.exception.KrlExportException;
 import tech.waitforu.pojo.carcallgraph.CallNode;
 import tech.waitforu.pojo.carcallgraph.CarReferenceNode;
 import tech.waitforu.pojo.carcallgraph.NodeType;
@@ -84,11 +85,10 @@ public class CallGraphExcelExportService {
      *
      * @param robotInfoList 机器人信息列表
      * @return xlsx 文件字节数组
-     * @throws IOException 写入工作簿失败时抛出
      */
-    public byte[] export(List<RobotInfo> robotInfoList) throws IOException {
+    public byte[] export(List<RobotInfo> robotInfoList) {
         if (robotInfoList == null || robotInfoList.isEmpty()) {
-            throw new IllegalArgumentException("导出失败：机器人列表为空");
+            throw new KrlExportException("导出失败：机器人列表为空");
         }
 
         try (XSSFWorkbook workbook = new XSSFWorkbook(); ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
@@ -104,6 +104,8 @@ public class CallGraphExcelExportService {
 
             workbook.write(outputStream);
             return outputStream.toByteArray();
+        } catch (IOException exception) {
+            throw new KrlExportException("写入Excel工作簿失败", exception);
         }
     }
 

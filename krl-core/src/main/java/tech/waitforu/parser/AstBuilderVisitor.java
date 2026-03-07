@@ -3,6 +3,7 @@ package tech.waitforu.parser;
 import org.antlr.v4.runtime.tree.TerminalNode;
 import tech.waitforu.antlr4.krlBaseVisitor;
 import tech.waitforu.antlr4.krlParser;
+import tech.waitforu.exception.KrlParseException;
 import tech.waitforu.pojo.ast.AstNode;
 import tech.waitforu.pojo.ast.KrlRoot;
 import tech.waitforu.pojo.ast.KrlBody;
@@ -70,7 +71,7 @@ public class AstBuilderVisitor extends krlBaseVisitor<AstNode> {
         if (dataUnit instanceof KrlBody) {
             krlRoot.setBody((KrlBody) dataUnit);
         } else {
-            throw new RuntimeException("提取到moduleData，无法转换为KrlBody");
+            throw new KrlParseException("文件 " + krlFile.getPath() + " 的 moduleData 无法转换为 KrlBody");
         }
 
         return krlRoot;
@@ -110,8 +111,7 @@ public class AstBuilderVisitor extends krlBaseVisitor<AstNode> {
      */
     @Override
     public AstNode visitDataList(krlParser.DataListContext ctx) {
-        System.out.println("暂未定义visitDataList相关方法");
-        throw new RuntimeException("暂未定义visitDataList相关方法");
+        throw new KrlParseException("暂未实现 DAT 数据列表解析: " + krlFile.getPath());
 //        return null;
     }
 
@@ -137,7 +137,7 @@ public class AstBuilderVisitor extends krlBaseVisitor<AstNode> {
         if (krlBody instanceof KrlBody) {
             krlRoot.setBody((KrlBody) krlBody);
         } else {
-            throw new RuntimeException("提取到moduleSource，无法转换为KrlBody");
+            throw new KrlParseException("文件 " + krlFile.getPath() + " 的 moduleSource 无法转换为 KrlBody");
         }
         return krlRoot;
     }

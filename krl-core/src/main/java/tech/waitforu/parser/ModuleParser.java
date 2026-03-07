@@ -6,6 +6,7 @@ import org.antlr.v4.runtime.CommonTokenStream;
 import org.antlr.v4.runtime.tree.ParseTree;
 import tech.waitforu.antlr4.krlLexer;
 import tech.waitforu.antlr4.krlParser;
+import tech.waitforu.exception.KrlParseException;
 import tech.waitforu.pojo.ast.AstNode;
 import tech.waitforu.pojo.ast.KrlRoot;
 import tech.waitforu.pojo.ast.programunit.Callable;
@@ -24,7 +25,7 @@ import java.util.List;
 public class ModuleParser {
 
     /** 待解析模块。 */
-    KrlModule module;
+    private final KrlModule module;
 
     /**
      * 构造解析器。
@@ -33,8 +34,7 @@ public class ModuleParser {
      */
     public ModuleParser(KrlModule module) {
         if (module == null) {
-            System.out.println("krlModule is null");
-            return;
+            throw new KrlParseException("模块不能为空，无法继续解析");
         }
         this.module = module;
     }
@@ -46,11 +46,7 @@ public class ModuleParser {
      */
     public AstNode getSrcAst() {
         KrlFile srcKrlFile = this.module.getModuleSrcFile();
-
         if (srcKrlFile == null) {
-//            System.out.println("krlModule:" + this.module.getModuleName() + " has no src file");
-            String dataPath = this.module.getModuleDatFile()==null? "null":this.module.getModuleDatFile().getPath();
-//            System.out.println("其dat文件地址为:" + dataPath);
             return null;
         }
         return parseKrlFile(srcKrlFile);
@@ -64,8 +60,6 @@ public class ModuleParser {
     public AstNode getDatAst() {
         KrlFile datKrlFile = this.module.getModuleDatFile();
         if (datKrlFile == null) {
-//            System.out.println("krlModule:" + this.module.getModuleName() + " has no dat file");
-//            System.out.println("其src文件地址为:" + this.module.getModuleSrcFile().getPath());
             return null;
         }
         return parseKrlFile(datKrlFile);
@@ -83,7 +77,7 @@ public class ModuleParser {
         }
 
         if (!(srcAst instanceof KrlRoot krlRoot)) {
-            throw new RuntimeException("srcAst is not ast.pojo.tech.waitforu.KrlRoot");
+            throw new KrlParseException("模块 " + module.getModuleName() + " 的源文件未解析为 KrlRoot");
         }
 
         return krlRoot.getBody().getProgramUnitList().stream()
@@ -117,11 +111,10 @@ public class ModuleParser {
         tech.waitforu.parser.AstBuilderVisitor astBuilderVisitor = new tech.waitforu.parser.AstBuilderVisitor(krlFile);
         AstNode root = astBuilderVisitor.visit(parseTree);
 
-        if (root instanceof KrlRoot) {
-            //AST为root根结点，正常返回。
-            return root;
+        if (!(root instanceof KrlRoot)) {
+            throw new KrlParseException("文件 " + krlFile.getPath() + " 未解析出 KrlRoot 节点");
         }
-        return null;
+        return root;
     }
 
 }

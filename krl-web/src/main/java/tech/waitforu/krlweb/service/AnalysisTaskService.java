@@ -3,15 +3,19 @@ package tech.waitforu.krlweb.service;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.http.HttpStatus;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
-import org.springframework.web.server.ResponseStatusException;
+import tech.waitforu.exception.KrlAnalysisException;
+import tech.waitforu.krlweb.exception.BadRequestException;
+import tech.waitforu.krlweb.exception.ConflictException;
+import tech.waitforu.krlweb.exception.InternalServerException;
+import tech.waitforu.krlweb.exception.NotFoundException;
+import tech.waitforu.krlweb.exception.TooManyRequestsException;
 import tech.waitforu.krlweb.config.ConfigStorageService;
 import tech.waitforu.krlweb.config.KrlAnalysisProperties;
 import tech.waitforu.krlweb.config.KrlStorageProperties;
@@ -64,7 +68,7 @@ public class AnalysisTaskService {
     /** 内存中的任务索引。 */
     private final Map<String, AnalysisTaskRecord> taskStore = new ConcurrentHashMap<>();
 
-    private static final Logger LOGGER = LogManager.getLogger(AnalysisTaskService.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(AnalysisTaskService.class);
 
     /**
      * 构造任务服务。
@@ -96,12 +100,15 @@ public class AnalysisTaskService {
     /**
      * 初始化任务相关目录。
      *
-     * @throws IOException 创建目录失败时抛出
      */
     @PostConstruct
-    public void initializeDirectories() throws IOException {
-        Files.createDirectories(getTempRoot());
-        Files.createDirectories(getResultRoot());
+    public void initializeDirectories() {
+        try {
+            Files.createDirectories(getTempRoot());
+            Files.createDirectories(getResultRoot());
+        } catch (IOException exception) {
+            throw new IllegalStateException("初始化任务存储目录失败", exception);
+        }
     }
 
     /**
@@ -120,16 +127,11 @@ public class AnalysisTaskService {
     public AnalysisTaskSnapshot submitTask(List<MultipartFile> files, String configText) {
         List<MultipartFile> uploadFiles = normalizeFiles(files);
         if (uploadFiles.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "请上传备份压缩包");
+            throw new BadRequestException("请上传备份压缩包");
         }
         validateQueueCapacity();
 
-        Config config;
-        try {
-            config = configStorageService.resolveConfig(configText);
-        } catch (IOException exception) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "配置内容无效，请检查YAML格式", exception);
-        }
+        Config config = configStorageService.resolveConfig(configText);
 
         String taskId = UUID.randomUUID().toString().replace("-", "");
         Path tempTaskDir = getTempRoot().resolve(taskId);
@@ -142,6 +144,8 @@ public class AnalysisTaskService {
         AnalysisTaskRecord taskRecord = new AnalysisTaskRecord(taskId, storedFiles, tempTaskDir, resultTaskDir,
                 resultJsonPath, excelPath);
         taskStore.put(taskId, taskRecord);
+        LOGGER.info("已提交分析任务: taskId={}, fileCount={}, tempDir={}, resultDir={}",
+                taskId, storedFiles.size(), tempTaskDir, resultTaskDir);
 
         analysisTaskExecutor.execute(() -> runTask(taskRecord, config));
         return taskRecord.toSnapshot();
@@ -176,7 +180,7 @@ public class AnalysisTaskService {
             });
             return taskRecord.result;
         } catch (IOException exception) {
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "读取任务结果失败", exception);
+            throw new InternalServerException("读取任务结果失败", exception);
         }
     }
 
@@ -190,12 +194,12 @@ public class AnalysisTaskService {
         AnalysisTaskRecord taskRecord = getTask(taskId);
         ensureTaskSucceeded(taskRecord);
         if (!Files.exists(taskRecord.excelPath)) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "当前任务尚未生成Excel文件");
+            throw new NotFoundException("当前任务尚未生成Excel文件");
         }
         try {
             return Files.readAllBytes(taskRecord.excelPath);
         } catch (IOException exception) {
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "读取Excel文件失败", exception);
+            throw new InternalServerException("读取Excel文件失败", exception);
         }
     }
 
@@ -218,7 +222,7 @@ public class AnalysisTaskService {
             }
             deleteDirectoryQuietly(taskRecord.tempTaskDir);
             deleteDirectoryQuietly(taskRecord.resultTaskDir);
-            LOGGER.info("已清理过期任务: {}", taskRecord.taskId);
+            LOGGER.info("已清理过期任务: taskId={}", taskRecord.taskId);
             return true;
         });
     }
@@ -239,6 +243,8 @@ public class AnalysisTaskService {
         taskRecord.status = AnalysisTaskState.RUNNING;
         taskRecord.startedAt = Instant.now();
         taskRecord.message = "正在解析备份文件";
+        LOGGER.info("开始执行分析任务: taskId={}, fileCount={}",
+                taskRecord.taskId, taskRecord.uploadFiles.size());
         try {
             Files.createDirectories(taskRecord.resultTaskDir);
             List<String> zipFilePathList = taskRecord.uploadFiles.stream()
@@ -256,12 +262,18 @@ public class AnalysisTaskService {
             taskRecord.status = AnalysisTaskState.SUCCEEDED;
             taskRecord.message = "任务执行完成";
             taskRecord.finishedAt = Instant.now();
-            LOGGER.info("分析任务执行成功: {}", taskRecord.taskId);
+            LOGGER.info("分析任务执行成功: taskId={}, resultPath={}, excelPath={}",
+                    taskRecord.taskId, taskRecord.resultJsonPath, taskRecord.excelPath);
+        } catch (KrlAnalysisException | IllegalArgumentException exception) {
+            taskRecord.status = AnalysisTaskState.FAILED;
+            taskRecord.message = sanitizeTaskFailureMessage(exception.getMessage());
+            taskRecord.finishedAt = Instant.now();
+            LOGGER.warn("分析任务执行失败: taskId={}, message={}", taskRecord.taskId, taskRecord.message, exception);
         } catch (Exception exception) {
             taskRecord.status = AnalysisTaskState.FAILED;
-            taskRecord.message = "任务执行失败: " + exception.getMessage();
+            taskRecord.message = "任务执行失败，请查看服务端日志";
             taskRecord.finishedAt = Instant.now();
-            LOGGER.error("分析任务执行失败: {}", taskRecord.taskId, exception);
+            LOGGER.error("分析任务执行失败: taskId={}", taskRecord.taskId, exception);
         }
     }
 
@@ -290,8 +302,7 @@ public class AnalysisTaskService {
                         || taskRecord.status == AnalysisTaskState.RUNNING)
                 .count();
         if (activeTaskCount >= analysisProperties.getMaxActiveTasks()) {
-            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
-                    "当前排队任务过多，请稍后重试");
+            throw new TooManyRequestsException("当前排队任务过多，请稍后重试");
         }
     }
 
@@ -303,7 +314,7 @@ public class AnalysisTaskService {
     private void validateZipFile(MultipartFile file) {
         String filename = file.getOriginalFilename();
         if (!StringUtils.hasText(filename) || !filename.toLowerCase().endsWith(".zip")) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "仅支持上传 .zip 备份文件");
+            throw new BadRequestException("仅支持上传 .zip 备份文件");
         }
     }
 
@@ -332,7 +343,7 @@ public class AnalysisTaskService {
             }
             return storedFiles;
         } catch (IOException exception) {
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "上传文件保存失败", exception);
+            throw new InternalServerException("上传文件保存失败", exception);
         }
     }
 
@@ -345,7 +356,7 @@ public class AnalysisTaskService {
     private AnalysisTaskRecord getTask(String taskId) {
         AnalysisTaskRecord taskRecord = taskStore.get(taskId);
         if (taskRecord == null) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "任务不存在或已过期");
+            throw new NotFoundException("任务不存在或已过期");
         }
         return taskRecord;
     }
@@ -357,10 +368,10 @@ public class AnalysisTaskService {
      */
     private void ensureTaskSucceeded(AnalysisTaskRecord taskRecord) {
         if (taskRecord.status == AnalysisTaskState.PENDING || taskRecord.status == AnalysisTaskState.RUNNING) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "任务尚未完成，请稍后重试");
+            throw new ConflictException("任务尚未完成，请稍后重试");
         }
         if (taskRecord.status == AnalysisTaskState.FAILED) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, taskRecord.message);
+            throw new ConflictException(taskRecord.message != null ? taskRecord.message : "任务执行失败");
         }
     }
 
@@ -408,13 +419,27 @@ public class AnalysisTaskService {
             pathStream.sorted(Comparator.reverseOrder()).forEach(path -> {
                 try {
                     Files.deleteIfExists(path);
-                } catch (IOException ignored) {
-                    // 清理过程尽量不中断其他任务，因此这里采用忽略式删除。
+                } catch (IOException exception) {
+                    LOGGER.warn("删除任务文件失败: {}", path, exception);
                 }
             });
-        } catch (IOException ignored) {
-            // 目录遍历失败时忽略，由后续清理周期再次处理。
+            LOGGER.debug("已清理任务目录: {}", directory);
+        } catch (IOException exception) {
+            LOGGER.warn("清理任务目录失败: {}", directory, exception);
         }
+    }
+
+    /**
+     * 将底层异常消息收敛为用户可读文本，避免把实现细节直接暴露给前端。
+     *
+     * @param rawMessage 原始异常消息
+     * @return 任务可读失败消息
+     */
+    private String sanitizeTaskFailureMessage(String rawMessage) {
+        if (!StringUtils.hasText(rawMessage)) {
+            return "任务执行失败，请检查输入文件和配置";
+        }
+        return rawMessage;
     }
 
     /**

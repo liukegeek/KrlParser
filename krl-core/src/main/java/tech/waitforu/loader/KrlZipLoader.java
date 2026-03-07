@@ -1,5 +1,6 @@
 package tech.waitforu.loader;
 
+import tech.waitforu.exception.KrlInputException;
 import tech.waitforu.rule.IgnoreRuleByStr;
 import tech.waitforu.pojo.krl.KrlFile;
 
@@ -16,6 +17,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Stream;
 
 import static java.nio.file.FileSystems.newFileSystem;
@@ -45,8 +47,10 @@ public class KrlZipLoader {
      * @param fileIgnoreRuleByStr 文件过滤规则
      */
     public KrlZipLoader(String filePath, IgnoreRuleByStr fileIgnoreRuleByStr) {
-        this.fileIgnoreRuleByStr = fileIgnoreRuleByStr;
-
+        if (filePath == null || filePath.isBlank()) {
+            throw new KrlInputException("备份压缩包路径不能为空");
+        }
+        this.fileIgnoreRuleByStr = Objects.requireNonNull(fileIgnoreRuleByStr, "文件过滤规则不能为空");
 
         // 压缩包路径
         Path zipPath = Paths.get(filePath);
@@ -63,30 +67,13 @@ public class KrlZipLoader {
                 // 递归遍历 zip 中全部路径，依次过滤出普通文件与符合规则的文件。
                 pathStream.filter(Files::isRegularFile)    // 过滤出普通文件，而不是文件夹。
                         .filter(path -> !fileIgnoreRuleByStr.isIgnore(path.toString())) // 过滤出符合规则的文件，即不是应被忽略的文件。
-                        .forEach(
-                                path -> {
-                                    try {
-                                        // 读取文件文本与基础属性，并缓存到索引结构中。
-                                        String content = Files.readString(path, StandardCharsets.ISO_8859_1);
-                                        BasicFileAttributes attr = Files.readAttributes(path, BasicFileAttributes.class);
-                                        // 获取时间，并解析成我们指定的格式。
-                                        String createTime = this.formatTime(attr.creationTime());
-                                        String modifyTime = this.formatTime(attr.lastModifiedTime());
-                                        long size = attr.size();
-
-                                        krlFileList.add(path.toString());
-                                        krlFileMap.put(path.toString(), new KrlFile(path.toString(), createTime, modifyTime, size, content));
-
-                                    } catch (Exception e) {
-                                        throw new RuntimeException("读取文件" + path + "时出错", e);
-                                    }
-                                }
-                        );
+                        .forEach(this::loadKrlFile);
             }
 
-        } catch (Exception e1) {
-            // 当前实现保留原有行为：打印异常并继续返回已读取部分结果。
-            e1.printStackTrace();
+        } catch (KrlInputException exception) {
+            throw exception;
+        } catch (Exception exception) {
+            throw new KrlInputException("读取备份压缩包失败: " + filePath, exception);
         }
 
     }
@@ -139,5 +126,26 @@ public class KrlZipLoader {
                 fileTime.toString(),
                 DateTimeFormatter.ISO_DATE_TIME
         ).format(DateTimeFormatter.ofPattern("yyyy年MM月dd日','HH:mm"));
+    }
+
+    /**
+     * 读取单个 zip 条目并写入缓存。
+     *
+     * @param path zip 内部路径
+     */
+    private void loadKrlFile(Path path) {
+        try {
+            // 读取文件文本与基础属性，并缓存到索引结构中。
+            String content = Files.readString(path, StandardCharsets.ISO_8859_1);
+            BasicFileAttributes attr = Files.readAttributes(path, BasicFileAttributes.class);
+            String createTime = this.formatTime(attr.creationTime());
+            String modifyTime = this.formatTime(attr.lastModifiedTime());
+            long size = attr.size();
+
+            krlFileList.add(path.toString());
+            krlFileMap.put(path.toString(), new KrlFile(path.toString(), createTime, modifyTime, size, content));
+        } catch (Exception exception) {
+            throw new KrlInputException("读取备份文件失败: " + path, exception);
+        }
     }
 }

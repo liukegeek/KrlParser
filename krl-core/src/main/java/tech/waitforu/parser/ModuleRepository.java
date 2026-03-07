@@ -1,5 +1,6 @@
 package tech.waitforu.parser;
 
+import tech.waitforu.exception.KrlParseException;
 import tech.waitforu.pojo.krl.KrlFile;
 import tech.waitforu.pojo.krl.KrlFileType;
 import tech.waitforu.pojo.krl.KrlModule;
@@ -130,6 +131,9 @@ public class ModuleRepository {
      * @param krlFile 待加入文件
      */
     public void addModule(KrlFile krlFile) {
+        if (krlFile == null) {
+            throw new KrlParseException("待加入仓库的文件不能为空");
+        }
         //只有src和dat文件会得到模块。
         if (krlFile.getType() == KrlFileType.SRC || krlFile.getType() == KrlFileType.DAT) {
             //模块名与文件名相同
@@ -140,7 +144,7 @@ public class ModuleRepository {
                 KrlModule module = new KrlModule(moduleName);
                 boolean addSuccess = addModule(module);
                 if (!addSuccess) {
-                    throw new RuntimeException("模块" + moduleName + "已经存在，无法重复添加");
+                    throw new KrlParseException("模块 " + moduleName + " 已存在，无法重复添加");
                 }
             }
 
@@ -158,7 +162,7 @@ public class ModuleRepository {
                 findByModuleName(moduleName).setModuleDatFile(krlFile);
 
             } else {
-                throw new RuntimeException("模块" + krlFile.getName() + "已经有了" + krlFile.getType() + "文件，无法重复添加");
+                throw new KrlParseException("模块 " + krlFile.getName() + " 已存在 " + krlFile.getType() + " 文件，无法重复添加");
             }
         }
     }
@@ -171,6 +175,9 @@ public class ModuleRepository {
      * @return true=加入成功；false=模块已存在
      */
     public boolean addModule(KrlModule krlModule) {
+        if (krlModule == null) {
+            throw new KrlParseException("待加入仓库的模块不能为空");
+        }
         //已经存在，则返回false。
         if (moduleMap.containsKey(krlModule.getModuleName())) return false;
 

@@ -1,5 +1,7 @@
 package tech.waitforu.service;
 
+import tech.waitforu.exception.KrlConfigException;
+import tech.waitforu.exception.KrlInputException;
 import tech.waitforu.loader.KrlZipLoader;
 import tech.waitforu.loader.YamlConfigLoad;
 import tech.waitforu.parser.CarCallReferenceAnalyze;
@@ -33,9 +35,8 @@ public class CarCallAnalysisService {
      * @param zipFilePath 备份 zip 绝对路径
      * @param configFilePath 配置文件绝对路径
      * @return 单个机器人的解析结果
-     * @throws IOException 配置加载或文件读取失败时抛出
      */
-    public RobotInfo carInvocateAnalyze(String zipFilePath, String configFilePath) throws IOException {
+    public RobotInfo carInvocateAnalyze(String zipFilePath, String configFilePath) {
         YamlConfigLoad yamlConfigLoad = new YamlConfigLoad(configFilePath);
         return carInvocateAnalyze(zipFilePath, yamlConfigLoad.loadConfig());
     }
@@ -46,11 +47,10 @@ public class CarCallAnalysisService {
      * @param zipFilePath 备份 zip 绝对路径
      * @param config 解析配置对象
      * @return 单个机器人的解析结果
-     * @throws IOException 文件读取失败时抛出
      */
-    public RobotInfo carInvocateAnalyze(String zipFilePath, Config config) throws IOException {
+    public RobotInfo carInvocateAnalyze(String zipFilePath, Config config) {
         if (config == null) {
-            throw new IllegalArgumentException("配置不能为空");
+            throw new KrlConfigException("配置不能为空");
         }
         // 1) 从配置对象中提取两类规则：文件加载规则、调用过滤规则。
         IgnoreRuleByStr fileLoadRule = new IgnoreRuleByStr(config.getFileLoadSection());
@@ -72,13 +72,18 @@ public class CarCallAnalysisService {
 
         // 5) 读取机器人信息文件 am.ini，用于补充机器人元数据。
         if (robotInfoConfig == null || robotInfoConfig.getFilePath() == null) {
-            throw new IllegalArgumentException("机器人信息文件路径不能为空");
+            throw new KrlInputException("机器人信息文件路径不能为空");
         }
         KrlFile robotInfoFile = krlZipLoader.getFile(robotInfoConfig.getFilePath());
         if (robotInfoFile == null) {
-            throw new IllegalArgumentException("机器人信息文件不存在");
+            throw new KrlInputException("机器人信息文件不存在: " + robotInfoConfig.getFilePath());
         }
-        IniParser iniParser = new IniParser(robotInfoFile.getContent());
+        IniParser iniParser;
+        try {
+            iniParser = new IniParser(robotInfoFile.getContent());
+        } catch (IOException exception) {
+            throw new KrlInputException("机器人信息文件格式无效: " + robotInfoConfig.getFilePath(), exception);
+        }
 
         // 从机器人信息文件中解析出机器人信息。
         return new RobotInfo(
@@ -97,9 +102,8 @@ public class CarCallAnalysisService {
      * @param zipFilePathList 备份 zip 路径列表
      * @param configFilePath 配置文件路径
      * @return 机器人结果列表（顺序与输入路径一致）
-     * @throws IOException 配置加载或文件读取失败时抛出
      */
-    public List<RobotInfo> carInvocateAnalyzeBatch(List<String> zipFilePathList, String configFilePath) throws IOException {
+    public List<RobotInfo> carInvocateAnalyzeBatch(List<String> zipFilePathList, String configFilePath) {
         YamlConfigLoad yamlConfigLoad = new YamlConfigLoad(configFilePath);
         return carInvocateAnalyzeBatch(zipFilePathList, yamlConfigLoad.loadConfig());
     }
@@ -110,9 +114,8 @@ public class CarCallAnalysisService {
      * @param zipFilePathList 备份 zip 路径列表
      * @param config 配置对象
      * @return 机器人结果列表；输入为空时返回空列表
-     * @throws IOException 任一备份分析失败时抛出
      */
-    public List<RobotInfo> carInvocateAnalyzeBatch(List<String> zipFilePathList, Config config) throws IOException {
+    public List<RobotInfo> carInvocateAnalyzeBatch(List<String> zipFilePathList, Config config) {
         if (zipFilePathList == null || zipFilePathList.isEmpty()) {
             return List.of();
         }

@@ -1,7 +1,7 @@
 package tech.waitforu.krlweb;
 
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.config.YamlPropertiesFactoryBean;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -25,12 +25,13 @@ import java.util.Properties;
 @SpringBootApplication
 @EnableScheduling
 public class KrlWebApplication {
+    private static final Logger LOGGER = LoggerFactory.getLogger(KrlWebApplication.class);
+    private static volatile String bootstrapWarningMessage;
+
     /** 类加载时先创建兜底日志目录，防止日志系统初始化过早。 */
     static {
         configureFallbackLoggingDirectory();
     }
-
-    private static final Logger LOGGER = LogManager.getLogger(KrlWebApplication.class);
 
     /**
      * 程序主入口。
@@ -46,6 +47,9 @@ public class KrlWebApplication {
             SpringApplication.run(KrlWebApplication.class, args);
             LOGGER.info("KRL Parser 已启动，运行模式: {}, 日志目录: {}",
                     bootstrapSettings.runtimeMode(), bootstrapSettings.logDir());
+            if (bootstrapWarningMessage != null) {
+                LOGGER.warn(bootstrapWarningMessage);
+            }
             if (bootstrapSettings.runtimeMode() == RuntimeMode.DESKTOP) {
                 openBrowser(desktopUrl);
             }
@@ -85,6 +89,7 @@ public class KrlWebApplication {
         try {
             port = Integer.parseInt(portValue);
         } catch (NumberFormatException exception) {
+            bootstrapWarningMessage = "启动端口配置无效，已回退到默认端口 2026";
             port = 2026;
         }
         return new BootstrapSettings(RuntimeMode.from(runtimeModeValue), port,
@@ -152,8 +157,8 @@ public class KrlWebApplication {
                 : Path.of(System.getProperty("user.home", "."), ".KrlParser", "logs");
         try {
             Files.createDirectories(logDir);
-        } catch (IOException ignored) {
-            // 启动兜底阶段不阻断，后续仍会尝试使用该目录。
+        } catch (IOException exception) {
+            bootstrapWarningMessage = "创建日志目录失败，将继续尝试使用该目录: " + logDir.toAbsolutePath().normalize();
         }
         System.setProperty("log.dir", logDir.toAbsolutePath().normalize().toString());
     }
@@ -193,7 +198,7 @@ public class KrlWebApplication {
                 runtime.exec(new String[]{"xdg-open", url});
             }
         } catch (IOException exception) {
-            LOGGER.error("自动打开浏览器失败: {}", exception.getMessage());
+            LOGGER.warn("自动打开浏览器失败: {}", url, exception);
         }
     }
 

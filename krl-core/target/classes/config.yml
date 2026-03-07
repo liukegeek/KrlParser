@@ -41,7 +41,10 @@ carInvokerParseSection:
     - "!BAS"
     - "!SET_CD_PARAMS"
     - "!RESET_IO"
-    - "SET_CD_PARAMS"
+    - "!SET_CD_PARAMS"
+    - "!couple"
+    - "!use_cd_params"
+    - "!sg_init"
     - "" #当前面所有规则都无法解析时，跳转到这里。这里以空字符开始，即所有字符串都必定符合规则。因而这里表明，默认为不忽略，且该语句必须放在最后。
   suffix:
     - "@SKIP@"  # 值为@SKIP@表示当前项不影响匹配

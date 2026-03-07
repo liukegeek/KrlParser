@@ -17,6 +17,12 @@
     <packaging>jar</packaging>
 
     <dependencies>
+        <!-- SLF4J 日志门面，统一 core 层日志接口 -->
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+        </dependency>
+
         <!-- ANTLR 4 用于解析 KRL 语法 -->
         <dependency>
             <groupId>org.antlr</groupId>
@@ -46,6 +52,13 @@
             <groupId>org.apache.poi</groupId>
             <artifactId>poi-ooxml</artifactId>
             <version>5.2.5</version>
+        </dependency>
+
+        <!-- 核心模块单元测试 -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
         </dependency>
     </dependencies>
 

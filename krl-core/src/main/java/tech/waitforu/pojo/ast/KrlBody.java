@@ -1,5 +1,6 @@
 package tech.waitforu.pojo.ast;
 
+import tech.waitforu.exception.KrlParseException;
 import tech.waitforu.pojo.ast.programunit.ProgramUnit;
 import tech.waitforu.pojo.krl.KrlFile;
 
@@ -42,7 +43,7 @@ public class KrlBody extends tech.waitforu.pojo.ast.AbstractAstNode implements A
      */
     public ProgramUnit getMainProgramUnit() {
         if (programUnitList.isEmpty()) {
-            throw new RuntimeException("KRL文件中没有程序单元");
+            throw new KrlParseException("KRL文件中没有程序单元");
         }
         // 主程序单元通常是第一个程序单元
         return programUnitList.getFirst();

@@ -1,11 +1,15 @@
 package tech.waitforu.krlweb.config;
 
 import jakarta.annotation.PostConstruct;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
+import tech.waitforu.exception.KrlConfigException;
 import tech.waitforu.loader.YamlConfigLoad;
+import tech.waitforu.krlweb.exception.InternalServerException;
 import tech.waitforu.pojo.config.Config;
 
 import java.io.IOException;
@@ -25,6 +29,7 @@ import java.nio.file.StandardCopyOption;
  */
 @Service
 public class ConfigStorageService {
+    private static final Logger LOGGER = LoggerFactory.getLogger(ConfigStorageService.class);
     // 标准化后的配置文件绝对路径
     private final Path configPath;
 
@@ -40,11 +45,14 @@ public class ConfigStorageService {
     /**
      * Bean 初始化后执行，确保磁盘上存在可用配置文件。
      *
-     * @throws IOException 初始化配置文件失败时抛出
      */
     @PostConstruct
-    public void initialize() throws IOException {
-        ensureConfigFileExists();
+    public void initialize() {
+        try {
+            ensureConfigFileExists();
+        } catch (IOException exception) {
+            throw new IllegalStateException("初始化配置文件失败", exception);
+        }
     }
 
     /**
@@ -60,11 +68,14 @@ public class ConfigStorageService {
      * 读取配置文件文本内容。
      *
      * @return UTF-8 编码的配置文本
-     * @throws IOException 读取失败时抛出
      */
-    public String getConfigContent() throws IOException {
-        ensureConfigFileExists();
-        return Files.readString(configPath, StandardCharsets.UTF_8);
+    public String getConfigContent() {
+        try {
+            ensureConfigFileExists();
+            return Files.readString(configPath, StandardCharsets.UTF_8);
+        } catch (IOException exception) {
+            throw new InternalServerException("读取配置文件失败", exception);
+        }
     }
 
     /**
@@ -72,15 +83,18 @@ public class ConfigStorageService {
      *
      * @param inlineConfigText 前端传入配置文本，可为空
      * @return 解析后的配置对象
-     * @throws IOException 配置格式错误或读取失败时抛出
      */
-    public Config resolveConfig(String inlineConfigText) throws IOException {
+    public Config resolveConfig(String inlineConfigText) {
         if (StringUtils.hasText(inlineConfigText)) {
             // 如果请求内配置文本非空，直接解析返回。
             return YamlConfigLoad.parseConfig(inlineConfigText);
         }
         // 如果请求内配置文本为空，从磁盘配置文件加载，解析并返回。
-        return new YamlConfigLoad(configPath.toString()).loadConfig();
+        try {
+            return new YamlConfigLoad(configPath.toString()).loadConfig();
+        } catch (KrlConfigException exception) {
+            throw new InternalServerException("磁盘配置文件无效，请检查 Config.yml", exception);
+        }
     }
 
     /**
@@ -104,6 +118,7 @@ public class ConfigStorageService {
         }
         try (InputStream inputStream = defaultConfig.getInputStream()) {
             Files.copy(inputStream, configPath, StandardCopyOption.REPLACE_EXISTING);
+            LOGGER.info("已创建默认配置文件: {}", configPath);
         }
     }
 }
