@@ -233,3 +233,12 @@ buildNumber.properties
 ### Antlr4 ###
 *.tokens
 *.interp
+
+### Node ###
+node_modules/
+
+### Local IDE State ###
+.idea/MarsCodeWorkspaceAppSettings.xml
+.idea/compiler.xml
+.idea/encodings.xml
+.idea/jarRepositories.xml
