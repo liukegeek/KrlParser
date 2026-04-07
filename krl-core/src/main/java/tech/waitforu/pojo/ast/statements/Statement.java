@@ -58,19 +58,4 @@ public interface Statement extends AstNode{
      */
     Statement getChildStatementFirst(StatementType statementType);
 
-    /**
-     * 添加子语句。
-     *
-     * @param statement 子语句
-     * @return true 表示添加成功
-     */
-    boolean addChildStatement(Statement statement);
-
-    /**
-     * 删除指定索引子语句。
-     *
-     * @param index 子语句索引
-     * @return 被删除语句，不存在返回 null
-     */
-    Statement removeChildStatement(int index);
 }

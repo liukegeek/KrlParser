@@ -12,9 +12,13 @@ import java.util.List;
  * 提供语句类型、子语句列表与常见 CRUD 操作。
  */
 public abstract class AbstractStatement extends AbstractAstNode implements Statement {
-    /** 子语句列表。 */
+    /**
+     * 子语句列表。
+     */
     protected List<Statement> childStatementList;
-    /** 语句类型。 */
+    /**
+     * 语句类型。
+     */
     protected StatementType statementType;
 
     /**
@@ -25,7 +29,7 @@ public abstract class AbstractStatement extends AbstractAstNode implements State
     protected AbstractStatement(StatementBuilder<?> builder) {
         super(builder);
         this.statementType = builder.statementType;
-        this.childStatementList = builder.childStatementList;
+        this.childStatementList = builder.childStatementList != null ? new ArrayList<>(builder.childStatementList) : new ArrayList<>();
     }
 
     /**
@@ -89,7 +93,7 @@ public abstract class AbstractStatement extends AbstractAstNode implements State
      * 获取指定类型和索引的子语句。
      *
      * @param statementType 语句类型
-     * @param index 索引
+     * @param index         索引
      * @return 子语句；越界返回 null
      */
     @Override
@@ -118,8 +122,7 @@ public abstract class AbstractStatement extends AbstractAstNode implements State
      * @param statement 子语句
      * @return true 表示添加成功
      */
-    @Override
-    public boolean addChildStatement(Statement statement) {
+    protected boolean addChildStatement(Statement statement) {
         if (statement == null) {
             return false;
         }
@@ -136,8 +139,7 @@ public abstract class AbstractStatement extends AbstractAstNode implements State
      * @param index 子语句索引
      * @return 删除的语句；越界返回 null
      */
-    @Override
-    public Statement removeChildStatement(int index) {
+    protected Statement removeChildStatement(int index) {
         if (index >= 0 && index < childStatementList.size()) {
             Statement statement = childStatementList.remove(index);
             removeChild(statement);
@@ -152,9 +154,13 @@ public abstract class AbstractStatement extends AbstractAstNode implements State
      * @param <T> Builder 自类型
      */
     public abstract static class StatementBuilder<T extends StatementBuilder<T>> extends AbstractAstNode.AstNodeBuilder<T> {
-        /** 语句类型。 */
+        /**
+         * 语句类型。
+         */
         protected StatementType statementType;
-        /** 子语句列表。 */
+        /**
+         * 子语句列表。
+         */
         protected List<Statement> childStatementList;
 
         /**

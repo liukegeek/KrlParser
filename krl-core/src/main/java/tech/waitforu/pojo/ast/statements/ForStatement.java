@@ -3,6 +3,7 @@ package tech.waitforu.pojo.ast.statements;
 import tech.waitforu.pojo.ast.expression.Expression;
 
 import java.util.ArrayList;
+import java.util.List;
 
 /**
  * FOR 语句节点。
@@ -16,6 +17,8 @@ public class ForStatement extends AbstractStatement implements Statement {
     private final Expression toExpression;
     /** 步长表达式。 */
     private final Expression stepExpression;
+    /** 循环体语句列表。 */
+    private final List<Statement> bodyStatementList;
 
     /**
      * 通过 Builder 构建 FOR 语句。
@@ -24,7 +27,8 @@ public class ForStatement extends AbstractStatement implements Statement {
      */
     private ForStatement(ForBuilder builder) {
         super(builder);
-        this.childStatementList = new ArrayList<>();
+        this.bodyStatementList = new ArrayList<>();
+
         this.counterName = builder.counterName;
         this.fromExpression = builder.fromExpression;
         this.toExpression = builder.toExpression;
@@ -35,7 +39,7 @@ public class ForStatement extends AbstractStatement implements Statement {
         addChild(stepExpression);
 
         if (builder.bodyStatementList != null) {
-            builder.bodyStatementList.forEach(this::addChildStatement);
+            builder.bodyStatementList.forEach(this::addBodyStatement);
         }
     }
 
@@ -84,6 +88,14 @@ public class ForStatement extends AbstractStatement implements Statement {
         return stepExpression;
     }
 
+    public boolean addBodyStatement(Statement statement) {
+        if (!addChildStatement(statement)) {
+            return false;
+        }
+        return bodyStatementList.add(statement);
+    }
+
+
     /**
      * FOR 语句 Builder。
      */
@@ -97,7 +109,7 @@ public class ForStatement extends AbstractStatement implements Statement {
         /** 步长表达式。 */
         private Expression stepExpression;
         /** 循环体语句列表。 */
-        private java.util.List<Statement> bodyStatementList = new ArrayList<>();
+        private List<Statement> bodyStatementList = new ArrayList<>();
 
         @Override
         protected ForBuilder self() {
@@ -154,7 +166,7 @@ public class ForStatement extends AbstractStatement implements Statement {
          * @param bodyStatementList 循环体语句列表
          * @return 当前 builder
          */
-        public ForBuilder withBodyStatementList(java.util.List<Statement> bodyStatementList) {
+        public ForBuilder withBodyStatementList(List<Statement> bodyStatementList) {
             this.bodyStatementList = bodyStatementList;
             return self();
         }

@@ -42,7 +42,9 @@ import java.util.List;
  * - 表达式（Invocation/Variable）
  */
 public class AstBuilderVisitor extends krlBaseVisitor<AstNode> {
-    /** 当前正在构建 AST 的源文件元信息。 */
+    /**
+     * 当前正在构建 AST 的源文件元信息。
+     */
     KrlFile krlFile;
 
     /**
@@ -279,7 +281,7 @@ public class AstBuilderVisitor extends krlBaseVisitor<AstNode> {
                     }
             );
             //添加case块中的语句
-            visitStatementList(statementListList.get(i).statement()).forEach(caseBlock::addChildStatement);
+            visitStatementList(statementListList.get(i).statement()).forEach(caseBlock::addBodyStatement);
 
             switchStatement.addCaseBlock(caseBlock);
         }
@@ -304,15 +306,17 @@ public class AstBuilderVisitor extends krlBaseVisitor<AstNode> {
      */
     @Override
     public AstNode visitLoopStatement(krlParser.LoopStatementContext ctx) {
+        List<Statement> bodyStatementList = new ArrayList<>();
+        bodyStatementList.addAll(visitStatementList(ctx.statementList().statement()));
+
         LoopStatement loopStatement = LoopStatement.builder()
                 .withStatementType(StatementType.LOOP)
                 .withStartIndex(ctx.getStart().getStartIndex())
                 .withStopIndex(ctx.getStop().getStopIndex())
                 .withKrlFile(krlFile)
                 .withChildStatementList(new ArrayList<>())
+                .withBodyStatementList(bodyStatementList)
                 .build();
-
-        visitStatementList(ctx.statementList().statement()).forEach(loopStatement::addChildStatement);
 
         return loopStatement;
     }
@@ -338,7 +342,6 @@ public class AstBuilderVisitor extends krlBaseVisitor<AstNode> {
                 .withStartIndex(ctx.getStart().getStartIndex())
                 .withStopIndex(ctx.getStop().getStopIndex())
                 .withStatementType(StatementType.IF_ELSE)
-                .withChildStatementList(new ArrayList<>())
                 .withConditionExpression(visitExpressionNode(ctx.expression()))
                 .withThenStatementList(thenStatements)
                 .withElseStatementList(elseStatements)
@@ -358,7 +361,6 @@ public class AstBuilderVisitor extends krlBaseVisitor<AstNode> {
                 .withStartIndex(ctx.getStart().getStartIndex())
                 .withStopIndex(ctx.getStop().getStopIndex())
                 .withStatementType(StatementType.FOR)
-                .withChildStatementList(new ArrayList<>())
                 .withCounterName(ctx.krlIdentifier().getText())
                 .withFromExpression(visitExpressionNode(ctx.expression(0)))
                 .withToExpression(visitExpressionNode(ctx.expression(1)))
@@ -380,7 +382,6 @@ public class AstBuilderVisitor extends krlBaseVisitor<AstNode> {
                 .withStartIndex(ctx.getStart().getStartIndex())
                 .withStopIndex(ctx.getStop().getStopIndex())
                 .withStatementType(StatementType.REPEAT)
-                .withChildStatementList(new ArrayList<>())
                 .withUntilExpression(visitExpressionNode(ctx.expression()))
                 .withBodyStatementList(visitStatementList(ctx.statementList().statement()))
                 .build();
@@ -399,7 +400,6 @@ public class AstBuilderVisitor extends krlBaseVisitor<AstNode> {
                 .withStartIndex(ctx.getStart().getStartIndex())
                 .withStopIndex(ctx.getStop().getStopIndex())
                 .withStatementType(StatementType.WHILE)
-                .withChildStatementList(new ArrayList<>())
                 .withConditionExpression(visitExpressionNode(ctx.expression()))
                 .withBodyStatementList(visitStatementList(ctx.statementList().statement()))
                 .build();
@@ -418,8 +418,7 @@ public class AstBuilderVisitor extends krlBaseVisitor<AstNode> {
                 .withStartIndex(ctx.getStart().getStartIndex())
                 .withStopIndex(ctx.getStop().getStopIndex())
                 .withStatementType(StatementType.EXPRESSION)
-                .withChildStatementList(new ArrayList<>())
-                .withExpression((Expression) visit(ctx.expression()))
+                .withExpression(visitExpressionNode(ctx.expression()))
                 .build();
     }
 

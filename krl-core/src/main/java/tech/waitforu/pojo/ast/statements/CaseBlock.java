@@ -9,6 +9,7 @@ import java.util.List;
 public class CaseBlock extends tech.waitforu.pojo.ast.statements.AbstractStatement implements tech.waitforu.pojo.ast.statements.Statement {
     /** case 标签列表；一个 case 可包含多个标签。 */
     List<String> caseLabel;
+    List<Statement> bodyStatementList;
 
 
     /**
@@ -18,7 +19,16 @@ public class CaseBlock extends tech.waitforu.pojo.ast.statements.AbstractStateme
      */
     private CaseBlock(CaseBuilder builder) {
         super(builder);
-        caseLabel = builder.caseLabel;
+        if (builder.caseLabel == null) {
+            caseLabel = new ArrayList<>();
+        } else {
+            caseLabel = builder.caseLabel;
+        }
+        bodyStatementList = new ArrayList<>();
+        if (builder.bodyStatementList != null) {
+            builder.bodyStatementList.forEach(this::addBodyStatement);
+        }
+
     }
 
     /**
@@ -36,6 +46,8 @@ public class CaseBlock extends tech.waitforu.pojo.ast.statements.AbstractStateme
     public static class CaseBuilder extends StatementBuilder<CaseBuilder> {
         /** case 标签列表。 */
         protected List<String> caseLabel;
+        /** case 块体语句列表。 */
+        protected List<Statement> bodyStatementList = new ArrayList<>();
 
 
         /**
@@ -56,6 +68,11 @@ public class CaseBlock extends tech.waitforu.pojo.ast.statements.AbstractStateme
          */
         public CaseBuilder withCaseLabel(List<String> caseLabel) {
             this.caseLabel = caseLabel;
+            return self();
+        }
+
+        public CaseBuilder withBodyStatementList(List<Statement> bodyStatementList) {
+            this.bodyStatementList = bodyStatementList;
             return self();
         }
 
@@ -105,7 +122,11 @@ public class CaseBlock extends tech.waitforu.pojo.ast.statements.AbstractStateme
      * @param caseLabel 标签列表
      */
     public void setCaseLabel(List<String> caseLabel) {
-        this.caseLabel = new ArrayList<>(caseLabel);
+        if (caseLabel == null) {
+            this.caseLabel = new ArrayList<>();
+        } else {
+            this.caseLabel = new ArrayList<>(caseLabel);
+        }
     }
 
     /**
@@ -118,5 +139,26 @@ public class CaseBlock extends tech.waitforu.pojo.ast.statements.AbstractStateme
      */
     public boolean addCaseLabel(String caseLabel) {
         return this.caseLabel.add(caseLabel);
+    }
+
+    /**
+     * 获取 case 块体语句列表。
+     *
+     * @return 语句列表拷贝
+     */
+    public List<Statement> getBodyStatementList() {
+        return List.copyOf(bodyStatementList);
+    }
+
+    /**
+     * 添加 case 块体语句。
+     * @param statement 语句
+     * @return true 表示添加成功
+     */
+    public boolean addBodyStatement(Statement statement) {
+        if (!addChildStatement(statement)) {
+            return false;
+        }
+        return bodyStatementList.add(statement);
     }
 }

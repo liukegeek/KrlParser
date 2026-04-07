@@ -3,6 +3,7 @@ package tech.waitforu.pojo.ast.statements;
 import tech.waitforu.pojo.ast.expression.Expression;
 
 import java.util.ArrayList;
+import java.util.List;
 
 /**
  * WHILE 语句节点。
@@ -10,6 +11,8 @@ import java.util.ArrayList;
 public class WhileStatement extends AbstractStatement implements Statement {
     /** 循环条件表达式。 */
     private final Expression conditionExpression;
+    /** 循环体语句列表。 */
+    private final List<Statement> bodyStatementList;
 
     /**
      * 通过 Builder 构建 WHILE 语句。
@@ -18,13 +21,13 @@ public class WhileStatement extends AbstractStatement implements Statement {
      */
     private WhileStatement(WhileBuilder builder) {
         super(builder);
-        this.childStatementList = new ArrayList<>();
         this.conditionExpression = builder.conditionExpression;
+        this.bodyStatementList = new ArrayList<>();
 
         addChild(conditionExpression);
 
         if (builder.bodyStatementList != null) {
-            builder.bodyStatementList.forEach(this::addChildStatement);
+            builder.bodyStatementList.forEach(this::addBodyStatement);
         }
     }
 
@@ -44,6 +47,28 @@ public class WhileStatement extends AbstractStatement implements Statement {
      */
     public Expression getConditionExpression() {
         return conditionExpression;
+    }
+
+    /**
+     * 获取循环体语句列表。
+     *
+     * @return 循环体语句列表
+     */
+    public List<Statement> getBodyStatementList() {
+        return bodyStatementList;
+    }
+
+    /**
+     * 添加循环体语句, 并将其添加到子语句列表中。
+     *
+     * @param statement 循环体语句
+     * @return 是否添加成功
+     */
+    public boolean addBodyStatement(Statement statement) {
+        if (!addChildStatement(statement)) {
+            return false;
+        }
+        return bodyStatementList.add(statement);
     }
 
     /**

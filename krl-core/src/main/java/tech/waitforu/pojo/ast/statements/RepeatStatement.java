@@ -3,6 +3,7 @@ package tech.waitforu.pojo.ast.statements;
 import tech.waitforu.pojo.ast.expression.Expression;
 
 import java.util.ArrayList;
+import java.util.List;
 
 /**
  * REPEAT/UNTIL 语句节点。
@@ -11,6 +12,9 @@ public class RepeatStatement extends AbstractStatement implements Statement {
     /** UNTIL 条件表达式。 */
     private final Expression untilExpression;
 
+    /** 循环体语句列表。 */
+    private final List<Statement> bodyStatementList;
+
     /**
      * 通过 Builder 构建 REPEAT/UNTIL 语句。
      *
@@ -18,13 +22,13 @@ public class RepeatStatement extends AbstractStatement implements Statement {
      */
     private RepeatStatement(RepeatBuilder builder) {
         super(builder);
-        this.childStatementList = new ArrayList<>();
         this.untilExpression = builder.untilExpression;
+        this.bodyStatementList = new ArrayList<>();
 
         addChild(untilExpression);
 
         if (builder.bodyStatementList != null) {
-            builder.bodyStatementList.forEach(this::addChildStatement);
+            builder.bodyStatementList.forEach(this::addBodyStatement);
         }
     }
 
@@ -44,6 +48,22 @@ public class RepeatStatement extends AbstractStatement implements Statement {
      */
     public Expression getUntilExpression() {
         return untilExpression;
+    }
+
+    /**
+     * 获取循环体语句列表。
+     *
+     * @return 循环体语句列表
+     */
+    public List<Statement> getBodyStatementList() {
+        return List.copyOf(bodyStatementList);
+    }
+
+    public boolean addBodyStatement(Statement statement) {
+        if (!addChildStatement(statement)) {
+            return false;
+        }
+        return bodyStatementList.add(statement);
     }
 
     /**

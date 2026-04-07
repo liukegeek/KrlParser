@@ -23,7 +23,6 @@ public class IfStatement extends AbstractStatement implements Statement {
      */
     private IfStatement(IfBuilder builder) {
         super(builder);
-        this.childStatementList = new ArrayList<>();
         this.conditionExpression = builder.conditionExpression;
         this.thenStatementList = new ArrayList<>();
         this.elseStatementList = new ArrayList<>();
