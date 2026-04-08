@@ -11,7 +11,7 @@ public class Config {
     /** 机器人信息文件路径配置。 */
     private RobotInfoConfig robotInfoConfig;
 
-    // 通过Jackson文件对config.yml进行解析时，依靠get、set方法进行属性的赋值和获取。
+    // 通过Jackson文件对config.yml进行解析时，依靠get、set方法进行属性的赋值和获取，而不是字段的名称。因此，即使字段名是 robotInfoConfig，只要有 setRobotInfo 方法，Jackson 就能正确地将 YAML 中的 robotInfo 字段映射到该属性
 
     /**
      * 获取文件加载过滤配置。

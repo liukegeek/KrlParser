@@ -20,10 +20,11 @@ class KrlZipLoaderTest {
     @Test
     void constructorShouldThrowWhenZipFileDoesNotExist() {
         StrRuleConfig ignoreSection = new StrRuleConfig();
-        ignoreSection.setPrefix(List.of("!"));
-        ignoreSection.setSuffix(List.of("@SKIP@"));
+        ignoreSection.setDefaultAction("ignore");
+        ignoreSection.setPrefix(List.of("/KRC/R1"));
+        ignoreSection.setSuffix(List.of());
 
         assertThrows(KrlInputException.class,
-                () -> new KrlZipLoader("/path/not/exist.zip", new IgnoreRuleByStr(ignoreSection)));
+                () -> new KrlZipLoader("/path/not/exist.zip", new IgnoreRuleByStr("fileLoadSection", ignoreSection)));
     }
 }
