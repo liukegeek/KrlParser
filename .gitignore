@@ -236,12 +236,18 @@ buildNumber.properties
 
 ### Node ###
 node_modules/
+dist/
 
 ### Local IDE State ###
+.idea/misc.xml
+.idea/vcs.xml
 .idea/MarsCodeWorkspaceAppSettings.xml
 .idea/compiler.xml
 .idea/encodings.xml
 .idea/jarRepositories.xml
+
+### Local Runtime Data ###
+KRL_LOG_DIR:/
 
 ### Local Reports ###
 技术报告/
