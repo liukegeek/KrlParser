@@ -26,11 +26,13 @@ let selectedRobotIndex = 0;
 let parsedRobots = [];
 let popoverDragState = null;
 let pendingNodeTap = null;
+let recentNodeHold = null;
 let activeTask = null;
 let taskPollTimer = null;
 let headerMenuOpen = false;
 
 const NODE_DOUBLE_TAP_DELAY = 260;
+const NODE_HOLD_TAP_SUPPRESS_DELAY = 420;
 
 const runtimeState = {
     runtimeMode: 'desktop',
@@ -1074,8 +1076,8 @@ function initCy(elements, layoutName = 'dagre') {
  * 绑定 Cytoscape 交互事件。
  * <p>
  * 节点单击负责选中与高亮；
- * 桌面端双击负责查看文件属性，右键负责查看调用上下文；
- * 长按节点则兼容移动端查看文件属性。
+ * 桌面端和移动端双击负责查看文件属性，右键负责查看调用上下文；
+ * 长按节点则兼容移动端兜底查看文件属性。
  */
 function bindCyEvents() {
     if (!cy) {
@@ -1085,9 +1087,40 @@ function bindCyEvents() {
     cy.on('tap', 'node', (event) => {
         const node = event.target;
         const renderedPosition = event.renderedPosition || node.renderedPosition();
+        const hasDetails = hasPropertyMapDetails(node);
+        const now = Date.now();
 
-        if (!isMobileViewport() && hasPropertyMapDetails(node)) {
-            const now = Date.now();
+        if (shouldSuppressTapAfterHold(node, now)) {
+            return;
+        }
+
+        if (isMobileViewport()) {
+            if (hasDetails
+                && pendingNodeTap
+                && pendingNodeTap.nodeId === node.id()
+                && now - pendingNodeTap.timestamp <= NODE_DOUBLE_TAP_DELAY) {
+                clearPendingNodeTap();
+                applyNodeSelection(node);
+                showNodePopover(node, 'left', renderedPosition);
+                return;
+            }
+
+            clearPendingNodeTap();
+            handleNodePrimaryAction(node);
+
+            if (hasDetails) {
+                pendingNodeTap = {
+                    nodeId: node.id(),
+                    timestamp: now,
+                    timerId: setTimeout(() => {
+                        pendingNodeTap = null;
+                    }, NODE_DOUBLE_TAP_DELAY)
+                };
+            }
+            return;
+        }
+
+        if (hasDetails) {
             if (pendingNodeTap
                 && pendingNodeTap.nodeId === node.id()
                 && now - pendingNodeTap.timestamp <= NODE_DOUBLE_TAP_DELAY) {
@@ -1116,6 +1149,7 @@ function bindCyEvents() {
     cy.on('tap', (event) => {
         if (event.target === cy) {
             clearPendingNodeTap();
+            clearRecentNodeHold();
             cy.elements().removeClass('dimmed highlighted');
             applyTypeHighlights();
             hideNodePopover();
@@ -1125,6 +1159,7 @@ function bindCyEvents() {
 
     cy.on('cxttap', 'node', (event) => {
         clearPendingNodeTap();
+        clearRecentNodeHold();
         const node = event.target;
         const renderedPosition = event.renderedPosition || node.renderedPosition();
         applyNodeSelection(node);
@@ -1137,6 +1172,7 @@ function bindCyEvents() {
         }
         clearPendingNodeTap();
         const node = event.target;
+        markRecentNodeHold(node, Date.now());
         const renderedPosition = event.renderedPosition || node.renderedPosition();
         applyNodeSelection(node);
         showNodePopover(node, 'left', renderedPosition);
@@ -1152,6 +1188,49 @@ function clearPendingNodeTap() {
     }
     clearTimeout(pendingNodeTap.timerId);
     pendingNodeTap = null;
+}
+
+/**
+ * 记录最近一次移动端长按，避免松手后的 tap 被误判为普通点击或双击。
+ *
+ * @param {object} node Cytoscape 节点对象
+ * @param {number} timestamp 触发时间戳
+ */
+function markRecentNodeHold(node, timestamp) {
+    recentNodeHold = {
+        nodeId: node.id(),
+        timestamp
+    };
+}
+
+/**
+ * 清理最近一次移动端长按状态。
+ */
+function clearRecentNodeHold() {
+    recentNodeHold = null;
+}
+
+/**
+ * 判断当前 tap 是否应该被最近一次长按吞掉。
+ *
+ * @param {object} node Cytoscape 节点对象
+ * @param {number} timestamp 当前事件时间戳
+ * @returns {boolean} true 表示本次 tap 应忽略
+ */
+function shouldSuppressTapAfterHold(node, timestamp) {
+    if (!recentNodeHold) {
+        return false;
+    }
+    if (timestamp - recentNodeHold.timestamp > NODE_HOLD_TAP_SUPPRESS_DELAY) {
+        clearRecentNodeHold();
+        return false;
+    }
+    if (recentNodeHold.nodeId === node.id()) {
+        clearRecentNodeHold();
+        return true;
+    }
+    clearRecentNodeHold();
+    return false;
 }
 
 /**
@@ -1184,9 +1263,6 @@ function handleNodePrimaryAction(node) {
     }
 
     applyNodeSelection(node);
-    if (isMobileViewport()) {
-        setSidebarVisible(true);
-    }
 }
 
 /**
@@ -1245,6 +1321,7 @@ function showNodePopover(node, side, anchorPosition) {
         return;
     }
     dom.nodePopover.innerHTML = '';
+    dom.nodePopover.scrollTop = 0;
     const title = document.createElement('div');
     title.className = 'node-popover-title';
     title.textContent = node.data('label') || node.id();
@@ -1259,19 +1336,32 @@ function showNodePopover(node, side, anchorPosition) {
         dom.nodePopover.appendChild(createPopoverRow('相关信息', node.data('relevantInfo') || '--'));
     }
 
+    dom.nodePopover.classList.remove('hidden');
+    dom.nodePopover.style.left = '8px';
+    dom.nodePopover.style.top = '8px';
+
     const containerRect = dom.cy.getBoundingClientRect();
-    const x = Math.min(containerRect.width - 280, anchorPosition.x + 16);
-    const y = Math.min(containerRect.height - 120, anchorPosition.y + 16);
+    const popoverWidth = dom.nodePopover.offsetWidth;
+    const popoverHeight = dom.nodePopover.offsetHeight;
+    const x = Math.min(containerRect.width - popoverWidth - 8, anchorPosition.x + 16);
+    const y = Math.min(containerRect.height - popoverHeight - 8, anchorPosition.y + 16);
     dom.nodePopover.style.left = `${Math.max(8, x)}px`;
     dom.nodePopover.style.top = `${Math.max(8, y)}px`;
-    dom.nodePopover.classList.remove('hidden');
 
-    title.addEventListener('mousedown', (mouseEvent) => {
-        mouseEvent.preventDefault();
+    title.addEventListener('pointerdown', (pointerEvent) => {
+        pointerEvent.preventDefault();
+        const shellRect = dom.mainShell?.getBoundingClientRect();
+        if (!shellRect) {
+            return;
+        }
         popoverDragState = {
-            offsetX: mouseEvent.clientX - dom.nodePopover.offsetLeft,
-            offsetY: mouseEvent.clientY - dom.nodePopover.offsetTop
+            pointerId: pointerEvent.pointerId,
+            offsetX: pointerEvent.clientX - shellRect.left - dom.nodePopover.offsetLeft,
+            offsetY: pointerEvent.clientY - shellRect.top - dom.nodePopover.offsetTop
         };
+        if (typeof title.setPointerCapture === 'function') {
+            title.setPointerCapture(pointerEvent.pointerId);
+        }
     });
 }
 
@@ -1472,16 +1562,26 @@ function bindPageEvents() {
     dom.nodeControlTrigger?.addEventListener('click', () => setNodeControlVisible(true));
     dom.nodeControlClose?.addEventListener('click', () => setNodeControlVisible(false));
 
-    document.addEventListener('mousemove', (event) => {
-        if (!popoverDragState || !dom.nodePopover) {
+    document.addEventListener('pointermove', (event) => {
+        if (!popoverDragState || !dom.nodePopover || event.pointerId !== popoverDragState.pointerId) {
             return;
         }
-        dom.nodePopover.style.left = `${event.clientX - popoverDragState.offsetX}px`;
-        dom.nodePopover.style.top = `${event.clientY - popoverDragState.offsetY}px`;
+        const shellRect = dom.mainShell?.getBoundingClientRect();
+        if (!shellRect) {
+            return;
+        }
+        const maxLeft = Math.max(8, shellRect.width - dom.nodePopover.offsetWidth - 8);
+        const maxTop = Math.max(8, shellRect.height - dom.nodePopover.offsetHeight - 8);
+        const nextLeft = event.clientX - shellRect.left - popoverDragState.offsetX;
+        const nextTop = event.clientY - shellRect.top - popoverDragState.offsetY;
+        dom.nodePopover.style.left = `${Math.min(maxLeft, Math.max(8, nextLeft))}px`;
+        dom.nodePopover.style.top = `${Math.min(maxTop, Math.max(8, nextTop))}px`;
     });
 
-    document.addEventListener('mouseup', () => {
-        popoverDragState = null;
+    document.addEventListener('pointerup', (event) => {
+        if (popoverDragState && event.pointerId === popoverDragState.pointerId) {
+            popoverDragState = null;
+        }
     });
 
     document.addEventListener('click', (event) => {
