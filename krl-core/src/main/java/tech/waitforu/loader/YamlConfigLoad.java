@@ -4,6 +4,7 @@ import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import tech.waitforu.exception.KrlConfigException;
 import tech.waitforu.pojo.config.Config;
+import tech.waitforu.pojo.config.ConfigValidator;
 
 import java.io.File;
 import java.io.IOException;
@@ -40,10 +41,14 @@ public class YamlConfigLoad {
                     if (configStream == null) {
                         throw new KrlConfigException("未找到默认配置文件 config.yml");
                     }
-                    return YAML_MAPPER.readValue(configStream, Config.class);
+                    Config config = YAML_MAPPER.readValue(configStream, Config.class);
+                    ConfigValidator.validate(config);
+                    return config;
                 }
             }
-            return YAML_MAPPER.readValue(configFile, Config.class);
+            Config config = YAML_MAPPER.readValue(configFile, Config.class);
+            ConfigValidator.validate(config);
+            return config;
         } catch (IOException exception) {
             throw new KrlConfigException("配置文件解析失败，请检查YAML格式", exception);
         }
@@ -60,7 +65,9 @@ public class YamlConfigLoad {
             throw new KrlConfigException("配置内容为空");
         }
         try {
-            return YAML_MAPPER.readValue(yamlContent, Config.class);
+            Config config = YAML_MAPPER.readValue(yamlContent, Config.class);
+            ConfigValidator.validate(config);
+            return config;
         } catch (IOException exception) {
             throw new KrlConfigException("配置内容无效，请检查YAML格式", exception);
         }

@@ -1,6 +1,5 @@
 package tech.waitforu.service;
 
-import tech.waitforu.exception.KrlConfigException;
 import tech.waitforu.exception.KrlInputException;
 import tech.waitforu.loader.KrlZipLoader;
 import tech.waitforu.loader.YamlConfigLoad;
@@ -9,6 +8,7 @@ import tech.waitforu.parser.IniParser;
 import tech.waitforu.parser.ModuleRepository;
 import tech.waitforu.pojo.carcallgraph.CallNode;
 import tech.waitforu.pojo.config.Config;
+import tech.waitforu.pojo.config.ConfigValidator;
 import tech.waitforu.pojo.config.RobotInfoConfig;
 import tech.waitforu.pojo.krl.KrlFile;
 import tech.waitforu.pojo.krl.RobotInfo;
@@ -49,12 +49,10 @@ public class CarCallAnalysisService {
      * @return 单个机器人的解析结果
      */
     public RobotInfo carInvocateAnalyze(String zipFilePath, Config config) {
-        if (config == null) {
-            throw new KrlConfigException("配置不能为空");
-        }
+        ConfigValidator.validate(config);
         // 1) 从配置对象中提取两类规则：文件加载规则、调用过滤规则。
-        IgnoreRuleByStr fileLoadRule = new IgnoreRuleByStr(config.getFileLoadSection());
-        IgnoreRuleByStr carInvokerParseRule = new IgnoreRuleByStr(config.getCarInvokerParseSection());
+        IgnoreRuleByStr fileLoadRule = new IgnoreRuleByStr("fileLoadSection", config.getFileLoadSection());
+        IgnoreRuleByStr carInvokerParseRule = new IgnoreRuleByStr("carInvokerParseSection", config.getCarInvokerParseSection());
         RobotInfoConfig robotInfoConfig = config.getRobotInfoConfig();
 
         // 2) 按 fileLoadRule 遍历 zip，读取参与分析的文件内容与元信息。

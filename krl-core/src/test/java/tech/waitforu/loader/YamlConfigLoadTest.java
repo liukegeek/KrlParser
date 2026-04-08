@@ -17,4 +17,63 @@ class YamlConfigLoadTest {
     void parseConfigShouldThrowWhenYamlIsInvalid() {
         assertThrows(KrlConfigException.class, () -> YamlConfigLoad.parseConfig("robotInfo: ["));
     }
+
+    @Test
+    void parseConfigShouldThrowWhenDefaultActionIsMissing() {
+        String yaml = """
+                robotInfo:
+                  filePath: "/am.ini"
+                fileLoadSection:
+                  prefix:
+                    - "/KRC/R1"
+                  suffix: []
+                carInvokerParseSection:
+                  defaultAction: allow
+                  prefix:
+                    - "!BAS"
+                  suffix: []
+                """;
+
+        assertThrows(KrlConfigException.class, () -> YamlConfigLoad.parseConfig(yaml));
+    }
+
+    @Test
+    void parseConfigShouldThrowWhenLegacySkipTokenIsUsed() {
+        String yaml = """
+                robotInfo:
+                  filePath: "/am.ini"
+                fileLoadSection:
+                  defaultAction: ignore
+                  prefix:
+                    - "@SKIP@"
+                  suffix: []
+                carInvokerParseSection:
+                  defaultAction: allow
+                  prefix:
+                    - "!BAS"
+                  suffix: []
+                """;
+
+        assertThrows(KrlConfigException.class, () -> YamlConfigLoad.parseConfig(yaml));
+    }
+
+    @Test
+    void parseConfigShouldThrowWhenBlankFallbackRuleIsUsed() {
+        String yaml = """
+                robotInfo:
+                  filePath: "/am.ini"
+                fileLoadSection:
+                  defaultAction: ignore
+                  prefix:
+                    - "!"
+                  suffix: []
+                carInvokerParseSection:
+                  defaultAction: allow
+                  prefix:
+                    - "!BAS"
+                  suffix: []
+                """;
+
+        assertThrows(KrlConfigException.class, () -> YamlConfigLoad.parseConfig(yaml));
+    }
 }
