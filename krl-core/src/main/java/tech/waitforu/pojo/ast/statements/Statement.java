@@ -10,7 +10,6 @@ import java.util.List;
  * 定义语句类型与子语句管理能力。
  */
 public interface Statement extends AstNode{
-    List<Statement> statementList = List.of(); //子语句列表
 
     /**
      * 获取语句类型。

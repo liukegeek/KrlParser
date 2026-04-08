@@ -31,23 +31,25 @@ carInvokerParseSection:
   # 程序中已设计为大小写不敏感，因此这里也不区分大小写
   prefix:
     - "!P00"  # 不解析默认自带的P00模块
-    - "!ServiceMain"
-    - "!waitSeg"
-    - "!EndSeg"
-    - "!enterZone"
-    - "!exitZone"
-    - "!toolChange"
-    - "!checkTOOL"
-    - "!SGL_Changing"
-    - "!taskComp"
-    - "!BAS"
-    - "!SET_CD_PARAMS"
-    - "!RESET_IO"
-    - "!SET_CD_PARAMS"
-    - "!couple"
-    - "!use_cd_params"
-    - "!sg_init"
-    - "" #当前面所有规则都无法解析时，跳转到这里。这里以空字符开始，即所有字符串都必定符合规则。因而这里表明，默认为不忽略，且该语句必须放在最后。
+    - "!ServiceMain"                    #不解析 服务程序
+    - "!waitSeg"                        #不解析 waitSeg
+    - "!EndSeg"                         #不解析 endSeg
+    - "!enterZone"                      #不解析 进干涉区
+    - "!exitZone"                       #不解析 出干涉区
+    - "!toolChange"                     #不解析 工具切换
+    - "!checkTOOL"                      #不解析 工具检查
+    - "!SGL_Changing"                   #不解析 SGL_Changing
+    - "!taskComp"                       #不解析 工作完成宏程序
+    - "!BAS"                            #不解析 库卡基础程序:BAS
+    - "!SET_CD_PARAMS"                  #不解析 设置参数设置 后台程序
+    - "!RESET_IO"                       #不解析 刷信号IO 程序
+    - "!couple"                         #不解析 耦合程序
+    - "!use_cd_params"                  #不解析 使用参数
+    - "!sg_init"                        #不解析 自带的初始化程序
+    - "!GUN1_Tipdress_DABAN"            #不解析 打板修磨
+    - "!GUN1_TipChange_DABAN"           #不解析 打板换帽
+    - "!GUN1_TipService"                #不解析 打板服务
+    - "" #当前面所有规则都无法解析时，跳转到这里。这里表明，默认为不忽略，且该语句必须放在最后。
   suffix:
     - "@SKIP@"  # 值为@SKIP@表示当前项不影响匹配
 #===========================================================================================#

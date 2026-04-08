@@ -244,7 +244,7 @@ public class AstBuilderVisitor extends krlBaseVisitor<AstNode> {
     @Override
     public AstNode visitSwitchStatement(krlParser.SwitchStatementContext ctx) {
         // Switch语句中的 表达式，就是变量。
-        Expression expression = (Expression) visit(ctx.expression()); //switch中用于匹配比较的表达式
+        Expression expression = visitExpressionNode(ctx.expression()); //switch中用于匹配比较的表达式
 
         SwitchStatement switchStatement = SwitchStatement.builder()
                 .withKrlFile(krlFile)
@@ -270,7 +270,6 @@ public class AstBuilderVisitor extends krlBaseVisitor<AstNode> {
                     .withStopIndex(statementListList.get(i).getStop().getStopIndex())
                     .withStatementType(StatementType.CASE_BLOCK)
                     .withCaseLabel(new ArrayList<>())
-                    .withChildStatementList(new ArrayList<>())
                     .build();
 
             //添加case标签表达式
@@ -281,7 +280,7 @@ public class AstBuilderVisitor extends krlBaseVisitor<AstNode> {
                     }
             );
             //添加case块中的语句
-            visitStatementList(statementListList.get(i).statement()).forEach(caseBlock::addBodyStatement);
+            visitStatementListNode(statementListList.get(i)).forEach(caseBlock::addBodyStatement);
 
             switchStatement.addCaseBlock(caseBlock);
         }
@@ -289,7 +288,7 @@ public class AstBuilderVisitor extends krlBaseVisitor<AstNode> {
         //添加default块中的语句
         if (switchBody.defaultLabel() != null) {
             if (switchBody.defaultBody != null) {
-                visitStatementList(switchBody.defaultBody.statement()).forEach(switchStatement::addDefaultStatement);
+                visitStatementListNode(switchBody.defaultBody).forEach(switchStatement::addDefaultStatement);
 
             }
         }
@@ -306,19 +305,13 @@ public class AstBuilderVisitor extends krlBaseVisitor<AstNode> {
      */
     @Override
     public AstNode visitLoopStatement(krlParser.LoopStatementContext ctx) {
-        List<Statement> bodyStatementList = new ArrayList<>();
-        bodyStatementList.addAll(visitStatementList(ctx.statementList().statement()));
-
-        LoopStatement loopStatement = LoopStatement.builder()
+        return LoopStatement.builder()
                 .withStatementType(StatementType.LOOP)
                 .withStartIndex(ctx.getStart().getStartIndex())
                 .withStopIndex(ctx.getStop().getStopIndex())
                 .withKrlFile(krlFile)
-                .withChildStatementList(new ArrayList<>())
-                .withBodyStatementList(bodyStatementList)
+                .withBodyStatementList(visitStatementListNode(ctx.statementList()))
                 .build();
-
-        return loopStatement;
     }
 
     /**
@@ -332,10 +325,10 @@ public class AstBuilderVisitor extends krlBaseVisitor<AstNode> {
         List<krlParser.StatementListContext> statementLists = ctx.statementList();
         List<Statement> thenStatements = statementLists.isEmpty()
                 ? new ArrayList<>()
-                : visitStatementList(statementLists.getFirst().statement());
+                : visitStatementListNode(statementLists.getFirst());
         List<Statement> elseStatements = statementLists.size() < 2
                 ? new ArrayList<>()
-                : visitStatementList(statementLists.get(1).statement());
+                : visitStatementListNode(statementLists.get(1));
 
         return IfStatement.builder()
                 .withKrlFile(krlFile)
@@ -365,7 +358,7 @@ public class AstBuilderVisitor extends krlBaseVisitor<AstNode> {
                 .withFromExpression(visitExpressionNode(ctx.expression(0)))
                 .withToExpression(visitExpressionNode(ctx.expression(1)))
                 .withStepExpression(ctx.expression().size() > 2 ? visitExpressionNode(ctx.expression(2)) : null)
-                .withBodyStatementList(visitStatementList(ctx.statementList().statement()))
+                .withBodyStatementList(visitStatementListNode(ctx.statementList()))
                 .build();
     }
 
@@ -383,7 +376,7 @@ public class AstBuilderVisitor extends krlBaseVisitor<AstNode> {
                 .withStopIndex(ctx.getStop().getStopIndex())
                 .withStatementType(StatementType.REPEAT)
                 .withUntilExpression(visitExpressionNode(ctx.expression()))
-                .withBodyStatementList(visitStatementList(ctx.statementList().statement()))
+                .withBodyStatementList(visitStatementListNode(ctx.statementList()))
                 .build();
     }
 
@@ -401,7 +394,7 @@ public class AstBuilderVisitor extends krlBaseVisitor<AstNode> {
                 .withStopIndex(ctx.getStop().getStopIndex())
                 .withStatementType(StatementType.WHILE)
                 .withConditionExpression(visitExpressionNode(ctx.expression()))
-                .withBodyStatementList(visitStatementList(ctx.statementList().statement()))
+                .withBodyStatementList(visitStatementListNode(ctx.statementList()))
                 .build();
     }
 
@@ -495,6 +488,19 @@ public class AstBuilderVisitor extends krlBaseVisitor<AstNode> {
             }
         }
         return statements;
+    }
+
+    /**
+     * 将语法树中的 statementList 节点转换为业务 AST 语句列表。
+     *
+     * @param statementListContext 语法树 statementList 节点
+     * @return 业务 AST 语句列表
+     */
+    private List<Statement> visitStatementListNode(krlParser.StatementListContext statementListContext) {
+        if (statementListContext == null) {
+            return List.of();
+        }
+        return visitStatementList(statementListContext.statement());
     }
 
     /**

@@ -4,10 +4,12 @@ import org.junit.jupiter.api.Test;
 import tech.waitforu.pojo.ast.KrlRoot;
 import tech.waitforu.pojo.ast.expression.Invocation;
 import tech.waitforu.pojo.ast.programunit.ProgramUnit;
+import tech.waitforu.pojo.ast.statements.CaseBlock;
 import tech.waitforu.pojo.ast.statements.ForStatement;
 import tech.waitforu.pojo.ast.statements.IfStatement;
 import tech.waitforu.pojo.ast.statements.RepeatStatement;
 import tech.waitforu.pojo.ast.statements.Statement;
+import tech.waitforu.pojo.ast.statements.SwitchStatement;
 import tech.waitforu.pojo.ast.statements.WhileStatement;
 import tech.waitforu.pojo.krl.KrlFile;
 import tech.waitforu.pojo.krl.KrlModule;
@@ -16,6 +18,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -70,6 +73,35 @@ class AstBuilderVisitorTest {
         assertInstanceOf(ForStatement.class, forStatement);
         assertInstanceOf(WhileStatement.class, whileStatement);
         assertInstanceOf(RepeatStatement.class, repeatStatement);
+    }
+
+    @Test
+    void shouldExposeReadOnlyStatementViews() {
+        KrlRoot root = parse("""
+                &ACCESS RVP2
+                &REL 13
+                DEF SWITCH_TEST()
+                WHILE FLAG
+                CALL_WHILE()
+                ENDWHILE
+                SWITCH PGNO
+                CASE 1
+                CALL_CASE()
+                DEFAULT
+                CALL_DEFAULT()
+                ENDSWITCH
+                END
+                """);
+
+        ProgramUnit programUnit = root.getBody().getMainProgramUnit();
+        WhileStatement whileStatement = assertInstanceOf(WhileStatement.class, programUnit.getStatementList().get(0));
+        SwitchStatement switchStatement = assertInstanceOf(SwitchStatement.class, programUnit.getStatementList().get(1));
+        CaseBlock caseBlock = switchStatement.getCaseBlocks().getFirst();
+
+        assertThrows(UnsupportedOperationException.class, () -> whileStatement.getBodyStatementList().add(caseBlock));
+        assertThrows(UnsupportedOperationException.class, () -> switchStatement.getCaseBlocks().add(caseBlock));
+        assertThrows(UnsupportedOperationException.class, () -> switchStatement.getDefaultStatementList().add(caseBlock));
+        assertThrows(UnsupportedOperationException.class, () -> caseBlock.getBodyStatementList().add(caseBlock));
     }
 
     private KrlRoot parse(String content) {

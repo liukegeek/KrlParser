@@ -88,6 +88,15 @@ public class ForStatement extends AbstractStatement implements Statement {
         return stepExpression;
     }
 
+    /**
+     * 获取循环体语句列表。
+     *
+     * @return 循环体语句列表
+     */
+    public List<Statement> getBodyStatementList() {
+        return List.copyOf(bodyStatementList);
+    }
+
     public boolean addBodyStatement(Statement statement) {
         if (!addChildStatement(statement)) {
             return false;

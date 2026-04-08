@@ -3,7 +3,7 @@ package tech.waitforu.pojo.ast.statements;
 import tech.waitforu.pojo.ast.AbstractAstNode;
 
 import java.util.ArrayList;
-import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 
 /**
@@ -49,7 +49,7 @@ public abstract class AbstractStatement extends AbstractAstNode implements State
      */
     @Override
     public List<StatementType> getChildStatementTypes() {
-        HashSet<StatementType> typeSets = new HashSet<>();
+        LinkedHashSet<StatementType> typeSets = new LinkedHashSet<>();
         for (Statement statement : childStatementList) {
             if (statement == null) {
                 continue;
@@ -66,7 +66,7 @@ public abstract class AbstractStatement extends AbstractAstNode implements State
      */
     @Override
     public List<Statement> getChildStatement() {
-        return new ArrayList<>(childStatementList);
+        return List.copyOf(childStatementList);
     }
 
     /**
@@ -86,7 +86,7 @@ public abstract class AbstractStatement extends AbstractAstNode implements State
                 statements.add(statement);
             }
         }
-        return statements;
+        return List.copyOf(statements);
     }
 
     /**
@@ -122,7 +122,7 @@ public abstract class AbstractStatement extends AbstractAstNode implements State
      * @param statement 子语句
      * @return true 表示添加成功
      */
-    protected boolean addChildStatement(Statement statement) {
+    protected final boolean addChildStatement(Statement statement) {
         if (statement == null) {
             return false;
         }
@@ -139,7 +139,7 @@ public abstract class AbstractStatement extends AbstractAstNode implements State
      * @param index 子语句索引
      * @return 删除的语句；越界返回 null
      */
-    protected Statement removeChildStatement(int index) {
+    protected final Statement removeChildStatement(int index) {
         if (index >= 0 && index < childStatementList.size()) {
             Statement statement = childStatementList.remove(index);
             removeChild(statement);

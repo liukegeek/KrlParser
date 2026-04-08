@@ -8,8 +8,8 @@ import java.util.List;
  */
 public class CaseBlock extends tech.waitforu.pojo.ast.statements.AbstractStatement implements tech.waitforu.pojo.ast.statements.Statement {
     /** case 标签列表；一个 case 可包含多个标签。 */
-    List<String> caseLabel;
-    List<Statement> bodyStatementList;
+    private List<String> caseLabel;
+    private final List<Statement> bodyStatementList;
 
 
     /**
@@ -22,7 +22,7 @@ public class CaseBlock extends tech.waitforu.pojo.ast.statements.AbstractStateme
         if (builder.caseLabel == null) {
             caseLabel = new ArrayList<>();
         } else {
-            caseLabel = builder.caseLabel;
+            caseLabel = new ArrayList<>(builder.caseLabel);
         }
         bodyStatementList = new ArrayList<>();
         if (builder.bodyStatementList != null) {
@@ -94,7 +94,7 @@ public class CaseBlock extends tech.waitforu.pojo.ast.statements.AbstractStateme
      * @return 标签列表拷贝
      */
     public List<String> getCaseLabel() {
-        return new ArrayList<>(caseLabel);
+        return List.copyOf(caseLabel);
     }
 
     /**

@@ -18,7 +18,6 @@ public class LoopStatement extends tech.waitforu.pojo.ast.statements.AbstractSta
      */
     private LoopStatement(LoopBuilder builder) {
         super(builder);
-        this.statementType = builder.statementType;
         this.bodyStatementList = new ArrayList<>();
 
         if (builder.bodyStatementList != null) {

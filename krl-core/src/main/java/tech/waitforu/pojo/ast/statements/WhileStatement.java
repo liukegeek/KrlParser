@@ -55,7 +55,7 @@ public class WhileStatement extends AbstractStatement implements Statement {
      * @return 循环体语句列表
      */
     public List<Statement> getBodyStatementList() {
-        return bodyStatementList;
+        return List.copyOf(bodyStatementList);
     }
 
     /**

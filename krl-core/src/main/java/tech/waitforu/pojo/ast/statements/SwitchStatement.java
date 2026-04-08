@@ -10,13 +10,13 @@ import java.util.List;
  */
 public class SwitchStatement extends tech.waitforu.pojo.ast.statements.AbstractStatement implements Statement {
     /** 用于匹配比较的表达式，如 {@code SWITCH PGNO} 中的 {@code PGNO}。 */
-    Expression switchExpression;
+    private final Expression switchExpression;
 
     // case 块列表。语法层 case 不单独成 statement，
     // 这里为便于处理将其包装成 Statement 子类型。
-    List<CaseBlock> caseBlocks;
+    private final List<CaseBlock> caseBlocks;
     /** default 分支语句列表。 */
-    List<Statement> defaultStatementList;
+    private final List<Statement> defaultStatementList;
 
     /**
      * 通过 Builder 构建 switch 语句。
@@ -26,12 +26,16 @@ public class SwitchStatement extends tech.waitforu.pojo.ast.statements.AbstractS
     private SwitchStatement(SwitchBuilder builder) {
         super(builder);
         this.switchExpression = builder.switchExpression;
-        this.addChild(switchExpression); //将switch表达式添加为子结点列表中
+        addChild(switchExpression);
 
-        this.caseBlocks = builder.caseBlocks;
-        caseBlocks.forEach(this::addChild); //将case块添加为子结点列表中
-        this.defaultStatementList = builder.defaultstatementList;
-        defaultStatementList.forEach(this::addChild); //将default语句添加为子结点列表中
+        this.caseBlocks = new ArrayList<>();
+        if (builder.caseBlocks != null) {
+            builder.caseBlocks.forEach(this::addCaseBlock);
+        }
+        this.defaultStatementList = new ArrayList<>();
+        if (builder.defaultstatementList != null) {
+            builder.defaultstatementList.forEach(this::addDefaultStatement);
+        }
     }
 
     /**
@@ -122,7 +126,7 @@ public class SwitchStatement extends tech.waitforu.pojo.ast.statements.AbstractS
      * @return case 块列表
      */
     public List<CaseBlock> getCaseBlocks() {
-        return caseBlocks;
+        return List.copyOf(caseBlocks);
     }
 
     /**
@@ -132,7 +136,9 @@ public class SwitchStatement extends tech.waitforu.pojo.ast.statements.AbstractS
      * @return true 表示添加成功
      */
     public boolean addCaseBlock(CaseBlock caseBlock) {
-        addChild(caseBlock);
+        if (!addChild(caseBlock)) {
+            return false;
+        }
         return caseBlocks.add(caseBlock);
     }
 
@@ -143,8 +149,12 @@ public class SwitchStatement extends tech.waitforu.pojo.ast.statements.AbstractS
      * @return 删除的 case 块
      */
     public CaseBlock removeCaseBlock(int index) {
-        removeChild(caseBlocks.get(index));
-        return caseBlocks.remove(index);
+        if (index < 0 || index >= caseBlocks.size()) {
+            return null;
+        }
+        CaseBlock caseBlock = caseBlocks.remove(index);
+        removeChild(caseBlock);
+        return caseBlock;
     }
 
     /**
@@ -153,7 +163,7 @@ public class SwitchStatement extends tech.waitforu.pojo.ast.statements.AbstractS
      * @return default 语句列表
      */
     public List<Statement> getDefaultStatementList() {
-        return defaultStatementList;
+        return List.copyOf(defaultStatementList);
     }
 
     /**
@@ -163,7 +173,9 @@ public class SwitchStatement extends tech.waitforu.pojo.ast.statements.AbstractS
      * @return true 表示添加成功
      */
      public boolean addDefaultStatement(Statement statement) {
-        addChild(statement);
+        if (!addChild(statement)) {
+            return false;
+        }
         return defaultStatementList.add(statement);
     }
 
@@ -174,9 +186,12 @@ public class SwitchStatement extends tech.waitforu.pojo.ast.statements.AbstractS
       * @return 删除的语句
       */
     public Statement removeDefaultStatement(int index) {
-        //这里的移除需要验证是否可行。
-        removeChild(defaultStatementList.get(index));
-        return defaultStatementList.remove(index);
+        if (index < 0 || index >= defaultStatementList.size()) {
+            return null;
+        }
+        Statement statement = defaultStatementList.remove(index);
+        removeChild(statement);
+        return statement;
     }
 
 
