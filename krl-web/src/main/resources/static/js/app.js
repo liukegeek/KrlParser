@@ -25,10 +25,12 @@ let currentRenderMode = 'graph';
 let selectedRobotIndex = 0;
 let parsedRobots = [];
 let popoverDragState = null;
-let tapTimer = null;
+let pendingNodeTap = null;
 let activeTask = null;
 let taskPollTimer = null;
 let headerMenuOpen = false;
+
+const NODE_DOUBLE_TAP_DELAY = 260;
 
 const runtimeState = {
     runtimeMode: 'desktop',
@@ -72,6 +74,7 @@ const dom = {
     infoSidebarClose: document.getElementById('infoSidebarClose'),
     sidebarTrigger: document.getElementById('sidebarTrigger'),
     metaName: document.getElementById('metaName'),
+    metaArchiveName: document.getElementById('metaArchiveName'),
     metaVersion: document.getElementById('metaVersion'),
     metaDate: document.getElementById('metaDate'),
     techPackList: document.getElementById('techPackList'),
@@ -355,9 +358,7 @@ function setSidebarVisible(visible) {
     }
     dom.infoSidebar.classList.toggle('panel-hidden', !visible);
     dom.infoSidebar.setAttribute('aria-hidden', String(!visible));
-    if (dom.sidebarTrigger) {
-        dom.sidebarTrigger.classList.toggle('hidden', visible || currentView !== 'car' || parsedRobots.length === 0);
-    }
+    refreshSidebarTriggerVisibility();
 }
 
 /**
@@ -394,6 +395,21 @@ function clearNodeDetail() {
 }
 
 /**
+ * 刷新“信息”按钮显隐。
+ *
+ * 机器人摘要在桌面端和移动端都应可达，因此只要存在机器人数据且侧栏未展开，
+ * 就显示入口按钮，而不是限制在某一个图谱视图中。
+ */
+function refreshSidebarTriggerVisibility() {
+    if (!dom.sidebarTrigger) {
+        return;
+    }
+    const hasRobotData = parsedRobots.length > 0 && !!getSelectedRobot();
+    const sidebarVisible = dom.infoSidebar && !dom.infoSidebar.classList.contains('panel-hidden');
+    dom.sidebarTrigger.classList.toggle('hidden', !hasRobotData || sidebarVisible);
+}
+
+/**
  * 更新节点详情区。
  *
  * @param {object} nodeData 节点数据
@@ -422,6 +438,7 @@ function updateNodeDetail(nodeData) {
 function updateRobotDetail(robotData) {
     if (!robotData) {
         dom.metaName.textContent = '--';
+        dom.metaArchiveName.textContent = '--';
         dom.metaVersion.textContent = '--';
         dom.metaDate.textContent = '--';
         dom.techPackList.innerHTML = '<div class="info-empty">暂无数据</div>';
@@ -429,6 +446,7 @@ function updateRobotDetail(robotData) {
     }
 
     dom.metaName.textContent = robotData.robotName || '--';
+    dom.metaArchiveName.textContent = robotData.archiveName || '--';
     dom.metaVersion.textContent = robotData.version || '--';
     dom.metaDate.textContent = robotData.archiveDate || '--';
     dom.techPackList.innerHTML = '';
@@ -674,7 +692,6 @@ function switchView(view) {
 
     if (view === 'line') {
         dom.renderModeSwitcher?.classList.add('hidden');
-        dom.sidebarTrigger?.classList.add('hidden');
         setSidebarVisible(false);
         setNodeControlVisible(false);
         applyRenderModeVisibility();
@@ -706,6 +723,8 @@ function renderLineGraph() {
     applyRenderModeVisibility();
     if (parsedRobots.length === 0) {
         initCy([], 'grid');
+        updateRobotDetail(null);
+        refreshSidebarTriggerVisibility();
         return;
     }
 
@@ -720,7 +739,9 @@ function renderLineGraph() {
     }));
 
     initCy(elements, 'grid');
+    updateRobotDetail(getSelectedRobot());
     clearNodeDetail();
+    refreshSidebarTriggerVisibility();
 }
 
 /**
@@ -733,6 +754,7 @@ function renderCarGraph() {
         initCy([], 'dagre');
         updateRobotDetail(null);
         clearNodeDetail();
+        refreshSidebarTriggerVisibility();
         return;
     }
 
@@ -779,6 +801,7 @@ function renderCarGraph() {
     applyTypeHighlights();
     updateRobotDetail(selectedRobot);
     clearNodeDetail();
+    refreshSidebarTriggerVisibility();
 }
 
 /**
@@ -792,6 +815,8 @@ function renderListView() {
     const selectedRobot = getSelectedRobot();
     if (!selectedRobot) {
         dom.listView.innerHTML = '<div class="list-section"><h3 class="list-section-title">暂无车型数据</h3></div>';
+        updateRobotDetail(null);
+        refreshSidebarTriggerVisibility();
         return;
     }
 
@@ -802,14 +827,30 @@ function renderListView() {
         items: selectedRobot.modules.filter((module) => group.types.includes(module.type))
     })).filter((group) => group.items.length > 0);
 
+    const techPackHtml = selectedRobot.techPacks.length === 0
+        ? '<div class="info-empty">暂无数据</div>'
+        : `<div class="tech-pack-list">
+                ${selectedRobot.techPacks.map((pack) => `
+                    <div class="tech-pack-item">
+                        <span>${escapeHtml(pack.name || '--')}</span>
+                        <span class="info-mono">${escapeHtml(pack.version || '')}</span>
+                    </div>
+                `).join('')}
+           </div>`;
+
     const summaryHtml = `
         <div class="list-section">
             <h3 class="list-section-title">机器人摘要</h3>
             <div class="list-grid">
                 <div class="list-card"><strong>机器人名称</strong>${escapeHtml(selectedRobot.robotName || '--')}</div>
+                <div class="list-card"><strong>备份文件</strong>${escapeHtml(selectedRobot.archiveName || '--')}</div>
                 <div class="list-card"><strong>版本</strong>${escapeHtml(selectedRobot.version || '--')}</div>
                 <div class="list-card"><strong>备份时间</strong>${escapeHtml(selectedRobot.archiveDate || '--')}</div>
                 <div class="list-card"><strong>调用边数量</strong>${selectedRobot.calls.length}</div>
+            </div>
+            <div class="list-card list-card-full">
+                <strong>已安装的包</strong>
+                ${techPackHtml}
             </div>
         </div>
     `;
@@ -852,6 +893,7 @@ function renderListView() {
     dom.listView.innerHTML = summaryHtml + moduleHtml + callHtml;
     updateRobotDetail(selectedRobot);
     clearNodeDetail();
+    refreshSidebarTriggerVisibility();
 }
 
 /**
@@ -1032,8 +1074,8 @@ function initCy(elements, layoutName = 'dagre') {
  * 绑定 Cytoscape 交互事件。
  * <p>
  * 节点单击负责选中与高亮；
- * 桌面端右键负责查看调用上下文；
- * 长按节点则兼容移动端查看上下文信息。
+ * 桌面端双击负责查看文件属性，右键负责查看调用上下文；
+ * 长按节点则兼容移动端查看文件属性。
  */
 function bindCyEvents() {
     if (!cy) {
@@ -1041,38 +1083,39 @@ function bindCyEvents() {
     }
 
     cy.on('tap', 'node', (event) => {
-        if (tapTimer) {
-            clearTimeout(tapTimer);
-            tapTimer = null;
-        }
         const node = event.target;
-        tapTimer = setTimeout(() => {
-            if (currentView === 'line') {
-                const nextRobotIndex = Number.parseInt(node.data('robotIndex'), 10);
-                if (Number.isInteger(nextRobotIndex) && nextRobotIndex >= 0) {
-                    selectedRobotIndex = nextRobotIndex;
-                }
-                currentRenderMode = isMobileViewport() ? 'list' : 'graph';
-                switchView('car');
-                tapTimer = null;
+        const renderedPosition = event.renderedPosition || node.renderedPosition();
+
+        if (!isMobileViewport() && hasPropertyMapDetails(node)) {
+            const now = Date.now();
+            if (pendingNodeTap
+                && pendingNodeTap.nodeId === node.id()
+                && now - pendingNodeTap.timestamp <= NODE_DOUBLE_TAP_DELAY) {
+                clearPendingNodeTap();
+                applyNodeSelection(node);
+                showNodePopover(node, 'left', renderedPosition);
                 return;
             }
 
-            cy.elements().removeClass('dimmed highlighted');
-            const lineage = node.predecessors().add(node).add(node.successors());
-            cy.elements().addClass('dimmed');
-            lineage.removeClass('dimmed').addClass('highlighted');
-            applyTypeHighlights();
-            updateNodeDetail(node.data());
-            if (isMobileViewport()) {
-                setSidebarVisible(true);
-            }
-            tapTimer = null;
-        }, 180);
+            clearPendingNodeTap();
+            pendingNodeTap = {
+                nodeId: node.id(),
+                timestamp: now,
+                timerId: setTimeout(() => {
+                    handleNodePrimaryAction(node);
+                    pendingNodeTap = null;
+                }, NODE_DOUBLE_TAP_DELAY)
+            };
+            return;
+        }
+
+        clearPendingNodeTap();
+        handleNodePrimaryAction(node);
     });
 
     cy.on('tap', (event) => {
         if (event.target === cy) {
+            clearPendingNodeTap();
             cy.elements().removeClass('dimmed highlighted');
             applyTypeHighlights();
             hideNodePopover();
@@ -1081,16 +1124,83 @@ function bindCyEvents() {
     });
 
     cy.on('cxttap', 'node', (event) => {
+        clearPendingNodeTap();
         const node = event.target;
         const renderedPosition = event.renderedPosition || node.renderedPosition();
+        applyNodeSelection(node);
         showNodePopover(node, 'right', renderedPosition);
     });
 
     cy.on('taphold', 'node', (event) => {
+        if (!isMobileViewport()) {
+            return;
+        }
+        clearPendingNodeTap();
         const node = event.target;
         const renderedPosition = event.renderedPosition || node.renderedPosition();
+        applyNodeSelection(node);
         showNodePopover(node, 'left', renderedPosition);
     });
+}
+
+/**
+ * 清理待执行的单击操作，避免与双击产生冲突。
+ */
+function clearPendingNodeTap() {
+    if (!pendingNodeTap) {
+        return;
+    }
+    clearTimeout(pendingNodeTap.timerId);
+    pendingNodeTap = null;
+}
+
+/**
+ * 判断节点是否存在可展示的文件属性信息。
+ *
+ * @param {object} node Cytoscape 节点对象
+ * @returns {boolean} true 表示存在 propertyMap 信息
+ */
+function hasPropertyMapDetails(node) {
+    const propertyMap = node?.data('propertyMap') || {};
+    return Boolean(propertyMap.srcFilePath || propertyMap.createTime || propertyMap.modifyTime);
+}
+
+/**
+ * 执行节点主操作。
+ *
+ * @param {object} node Cytoscape 节点对象
+ */
+function handleNodePrimaryAction(node) {
+    if (currentView === 'line') {
+        const nextRobotIndex = Number.parseInt(node.data('robotIndex'), 10);
+        if (Number.isInteger(nextRobotIndex) && nextRobotIndex >= 0) {
+            selectedRobotIndex = nextRobotIndex;
+        }
+        updateRobotDetail(getSelectedRobot());
+        refreshSidebarTriggerVisibility();
+        currentRenderMode = isMobileViewport() ? 'list' : 'graph';
+        switchView('car');
+        return;
+    }
+
+    applyNodeSelection(node);
+    if (isMobileViewport()) {
+        setSidebarVisible(true);
+    }
+}
+
+/**
+ * 选中并高亮指定节点，同时刷新详情区。
+ *
+ * @param {object} node Cytoscape 节点对象
+ */
+function applyNodeSelection(node) {
+    cy.elements().removeClass('dimmed highlighted');
+    const lineage = node.predecessors().add(node).add(node.successors());
+    cy.elements().addClass('dimmed');
+    lineage.removeClass('dimmed').addClass('highlighted');
+    applyTypeHighlights();
+    updateNodeDetail(node.data());
 }
 
 /**

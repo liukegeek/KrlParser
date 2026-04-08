@@ -84,6 +84,10 @@
                     <div class="info-label">机器人名字</div>
                     <div id="metaName" class="info-value">--</div>
                 </div>
+                <div class="info-card">
+                    <div class="info-label">备份文件</div>
+                    <div id="metaArchiveName" class="info-break">--</div>
+                </div>
                 <div class="info-grid">
                     <div class="info-card">
                         <div class="info-label">版本</div>
@@ -104,7 +108,7 @@
 
             <div class="panel-section">
                 <div class="section-title">节点信息</div>
-                <div id="nodeDetailEmpty" class="info-empty">点击图谱节点后在此查看详情。手机端同样通过点击节点查看。</div>
+                <div id="nodeDetailEmpty" class="info-empty">点击节点可在此查看详情。桌面端双击节点查看文件属性，右键查看相关信息；移动端长按节点查看文件属性。</div>
                 <div id="nodeDetailContent" class="node-detail-grid hidden">
                     <div class="info-card info-card-accent-soft">
                         <div class="info-label">节点名称</div>
@@ -135,11 +139,6 @@
                 </div>
             </div>
         </aside>
-
-        <button id="sidebarTrigger" type="button" class="floating-trigger hidden">
-            <i data-lucide="info"></i>
-            <span>信息</span>
-        </button>
 
         <div id="canvasShell" class="canvas-shell">
             <div id="cy" class="canvas-view"></div>

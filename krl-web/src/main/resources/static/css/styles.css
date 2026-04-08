@@ -407,6 +407,10 @@ button {
     background: #ffffff;
 }
 
+.list-card-full {
+    margin-top: 12px;
+}
+
 .list-card strong {
     display: block;
     margin-bottom: 6px;
@@ -689,13 +693,8 @@ button {
     background: #ffffff;
 }
 
-#sidebarTrigger {
-    left: 18px;
-    top: 18px;
-}
-
 #nodeControlTrigger {
-    left: 18px;
+    right: 18px;
     bottom: 18px;
 }
 
@@ -1050,13 +1049,6 @@ button {
 
     .info-panel.panel-hidden {
         transform: translateY(calc(100% + 24px));
-    }
-
-    #sidebarTrigger {
-        top: auto;
-        left: 12px;
-        bottom: calc(env(safe-area-inset-bottom) + 154px);
-        max-width: calc(50vw - 18px);
     }
 
     .node-control-panel {
