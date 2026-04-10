@@ -24,7 +24,7 @@ public class KrlWebInfrastructureConfiguration {
     /**
      * 注册分析任务线程池。
      * <p>
-     * 当前服务器仅 3.6GiB 内存，因此默认并发度控制在 1。
+     * 默认并发度控制在较保守的范围内，以降低资源占用。
      * 如需提高吞吐，可通过配置项显式调整。
      *
      * @param analysisProperties 任务并发配置

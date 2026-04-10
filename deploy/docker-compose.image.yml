@@ -1,9 +1,7 @@
 services:
   krl-parser:
+    image: ${KRL_IMAGE:-krlparser:latest}
     container_name: krl-parser
-    build:
-      context: ..
-      dockerfile: Dockerfile
     ports:
       - "${KRL_PUBLIC_PORT:-2026}:2026"
     environment:

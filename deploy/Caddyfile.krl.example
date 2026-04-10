@@ -1,6 +1,6 @@
 # 将以下片段追加到服务器现有 Caddyfile 中。
-# 当前服务器 caddy 容器所在 Docker network 已确认是 blog-backend-net。
+# 请将 `<your-domain>` 与 `<your-port>` 替换为你的实际域名和本机监听端口。
 
-krl.waitforu.tech {
-    reverse_proxy krl-parser:2026
+<your-domain> {
+    reverse_proxy 127.0.0.1:<your-port>
 }
