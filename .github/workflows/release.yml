@@ -46,15 +46,36 @@ jobs:
           # 启用Maven缓存，加快构建速度
           cache: maven
 
-      # 步骤3：使用Maven构建JAR文件
+      # 步骤3：解析本次构建版本
+      - name: Resolve build version
+        id: version_meta
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+          else
+            VERSION="dev-${GITHUB_SHA::7}"
+          fi
+
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      # 步骤4：使用Maven构建JAR文件
       - name: Build with Maven
         # 运行Maven命令：必须在根目录运行 install，确保 krl-core 能被 krl-web 引用
         # -B: 以批处理模式运行，减少输出
         # -DskipTests: 跳过测试，加快构建速度
         # package: 执行打包命令，生成JAR文件
-        run: mvn -B clean install -DskipTests
+        shell: bash
+        run: |
+          set -euo pipefail
 
-      # 步骤4：打包应用镜像
+          VERSION="${{ steps.version_meta.outputs.version }}"
+          mvn -B versions:set -DnewVersion="$VERSION" -DgenerateBackupPoms=false -DprocessAllModules=true
+          mvn -B clean install -DskipTests
+
+      # 步骤5：打包应用镜像
       - name: Package app image
         # 使用bash shell执行命令
         shell: bash
@@ -128,12 +149,7 @@ jobs:
           set -euo pipefail
           
           APP_NAME="KRLParser"
-          
-          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
-            VERSION="${GITHUB_REF_NAME#v}"
-          else
-            VERSION="dev-${GITHUB_SHA::7}"
-          fi
+          VERSION="${{ steps.version_meta.outputs.version }}"
           
           if [[ "${{ runner.os }}" == "Windows" ]]; then
             ICON_PATH="icons/windowsIcon.ico"
@@ -173,9 +189,7 @@ jobs:
             ditto -c -k --sequesterRsrc --keepParent "build/dist/${APP_NAME}.app" "${APP_NAME}-${VERSION}-macos.zip"
           fi
 
-
-
-      # 步骤5：上传构建工件
+      # 步骤6：上传构建工件
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:

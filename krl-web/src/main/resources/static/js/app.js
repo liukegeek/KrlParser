@@ -36,7 +36,8 @@ const NODE_HOLD_TAP_SUPPRESS_DELAY = 420;
 
 const runtimeState = {
     runtimeMode: 'desktop',
-    analysisMode: 'sync'
+    analysisMode: 'sync',
+    appVersion: ''
 };
 
 const uploadState = {
@@ -75,6 +76,7 @@ const dom = {
     infoSidebar: document.getElementById('infoSidebar'),
     infoSidebarClose: document.getElementById('infoSidebarClose'),
     sidebarTrigger: document.getElementById('sidebarTrigger'),
+    appVersionBadge: document.getElementById('appVersionBadge'),
     metaName: document.getElementById('metaName'),
     metaArchiveName: document.getElementById('metaArchiveName'),
     metaVersion: document.getElementById('metaVersion'),
@@ -203,6 +205,23 @@ function refreshRuntimeBadge() {
     dom.runtimeStatusBadge.className = 'status-badge';
     dom.runtimeStatusBadge.classList.add(runtimeState.runtimeMode === 'server' ? 'info' : 'success');
     dom.runtimeStatusBadge.textContent = runtimeState.runtimeMode === 'server' ? 'Server 模式' : 'Desktop 模式';
+}
+
+/**
+ * 刷新标题中的应用版本。
+ * <p>
+ * 若当前构建未提供版本，则隐藏版本角标，避免展示错误信息。
+ */
+function refreshAppVersionBadge() {
+    if (!dom.appVersionBadge) {
+        return;
+    }
+    const rawVersion = typeof runtimeState.appVersion === 'string' ? runtimeState.appVersion.trim() : '';
+    const displayVersion = rawVersion
+        ? (rawVersion.toLowerCase().startsWith('v') ? rawVersion : `v${rawVersion}`)
+        : '';
+    dom.appVersionBadge.textContent = displayVersion;
+    dom.appVersionBadge.classList.toggle('hidden', !displayVersion);
 }
 
 /**
@@ -1662,7 +1681,9 @@ async function loadRuntimeStatus() {
     const payload = await response.json();
     runtimeState.runtimeMode = payload.runtimeMode || 'desktop';
     runtimeState.analysisMode = payload.analysisMode || (runtimeState.runtimeMode === 'server' ? 'async' : 'sync');
+    runtimeState.appVersion = payload.appVersion || '';
     refreshRuntimeBadge();
+    refreshAppVersionBadge();
     refreshModeSpecificUi();
     updateActionButtons();
 }

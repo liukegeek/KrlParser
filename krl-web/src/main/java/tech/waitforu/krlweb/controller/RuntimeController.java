@@ -1,5 +1,8 @@
 package tech.waitforu.krlweb.controller;
 
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.info.BuildProperties;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -20,14 +23,24 @@ import tech.waitforu.krlweb.config.KrlRuntimeProperties;
 public class RuntimeController {
     /** 当前运行模式配置。 */
     private final KrlRuntimeProperties runtimeProperties;
+    /** 当前应用版本。 */
+    private final String appVersion;
 
     /**
      * 构造运行模式控制器。
      *
-     * @param runtimeProperties 运行模式配置
+     * @param runtimeProperties     运行模式配置
+     * @param buildPropertiesProvider 构建信息提供器
      */
-    public RuntimeController(KrlRuntimeProperties runtimeProperties) {
+    @Autowired
+    public RuntimeController(KrlRuntimeProperties runtimeProperties,
+                             ObjectProvider<BuildProperties> buildPropertiesProvider) {
+        this(runtimeProperties, resolveAppVersion(buildPropertiesProvider.getIfAvailable()));
+    }
+
+    RuntimeController(KrlRuntimeProperties runtimeProperties, String appVersion) {
         this.runtimeProperties = runtimeProperties;
+        this.appVersion = appVersion == null ? "" : appVersion.trim();
     }
 
     /**
@@ -39,7 +52,21 @@ public class RuntimeController {
     public RuntimeStatusResponse status() {
         String runtimeMode = runtimeProperties.getMode().name().toLowerCase();
         String analysisMode = runtimeProperties.isServerMode() ? "async" : "sync";
-        return new RuntimeStatusResponse(runtimeMode, analysisMode);
+        return new RuntimeStatusResponse(runtimeMode, analysisMode, appVersion);
+    }
+
+    /**
+     * 解析应用版本号。
+     *
+     * @param buildProperties 构建信息
+     * @return 构建版本，缺失时返回空字符串
+     */
+    private static String resolveAppVersion(BuildProperties buildProperties) {
+        if (buildProperties == null) {
+            return "";
+        }
+        String version = buildProperties.getVersion();
+        return version == null ? "" : version.trim();
     }
 
     /**
@@ -47,7 +74,8 @@ public class RuntimeController {
      *
      * @param runtimeMode  当前运行模式，`desktop` 或 `server`
      * @param analysisMode 当前分析模式，`sync` 或 `async`
+     * @param appVersion   当前应用版本
      */
-    public record RuntimeStatusResponse(String runtimeMode, String analysisMode) {
+    public record RuntimeStatusResponse(String runtimeMode, String analysisMode, String appVersion) {
     }
 }
