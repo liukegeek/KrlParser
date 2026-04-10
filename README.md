@@ -1,266 +1,236 @@
 # KRLParser
 
-KRLParser 是一款面向 KUKA 机器人备份包的本地 Web 分析工具，用于解析 KRL 程序并生成调用关系。
+> KUKA 机器人备份调用关系分析工具
 
-它基于以下技术栈：
-- `ANTLR4`：KRL 词法/语法解析
-- `Spring Boot`：本地服务与接口
+## 项目简介
+
+KRLParser 是一个面向 KUKA 机器人备份包的调用关系分析工具，用于从 KRL 程序中提取模块关系、构建调用链图谱，并导出可归档的 Excel 结果。
+
+它同时支持桌面本地分析和服务器部署后的异步任务分析，适合现场排查、程序结构梳理、批量备份审查和结果留档等场景。
+
+## 核心能力
+
+- 解析 `*.zip` 备份包，遍历模块并构建 KRL AST
+- 支持 1~N 个备份包批量分析，按机器人汇总结果
+- 提供线体视图与车型视图，支持图谱/列表双视图切换
+- 支持节点高亮、文件属性查看和上下文信息查看
+- 支持在线读取与编辑本次分析使用的 `Config.yml`
+- 支持导出 Excel，每个机器人一个 Sheet，包含调用树与关系矩阵
+- 服务器模式支持异步任务、结果落盘与过期清理
+
+## 技术栈
+
+- `ANTLR4`：KRL 词法与语法解析
+- `Spring Boot`：本地/服务器运行与 API 提供
 - `Cytoscape.js + Dagre`：调用关系可视化
 - `Apache POI`：Excel 导出
 
----
+## 运行模式
 
-## 1. 目标与定位
+KRLParser 支持同一套代码在两种运行形态下工作，前端会通过 `GET /api/runtime/status` 自动识别当前模式。
 
-针对现场备份包中常见的结构：
-`Cell -> P程序 -> 车型代码 -> 车型程序 -> 轨迹程序`，
-KRLParser 提供从压缩包读取、规则过滤、语义解析、图谱展示到 Excel 导出的完整闭环。
+| 模式 | 适用场景 | 分析链路 | 结果特征 |
+| --- | --- | --- | --- |
+| `desktop` | 本机单人分析、现场快速排查 | 同步分析 | 请求完成后直接返回结果 |
+| `server` | 云服务器部署、多人共享使用 | 异步任务分析 | 结果落盘，可轮询状态并下载 Excel |
 
----
+- 默认运行模式为 `desktop`
+- 设置 `KRL_RUNTIME_MODE=server` 后，前端会切换到任务化接口
+- 服务器模式默认不启用登录认证，对公网开放时请通过网关、内网或反向代理策略控制入口
 
-## 2. 新增功能（本次版本重点）
+## 快速开始
 
-### 2.1 配置文件托管与在线编辑
+### 环境要求
 
-- 启动时自动检查配置文件路径（默认：`~/.KrlParser/Config.yml`）
-- 若不存在，则由 `krl-core/src/main/resources/config.yml` 自动落盘生成
-- 前端进入页面后自动拉取当前配置（`GET /api/config`）
-- 页面新增 `Config` 按钮，可在线查看/编辑本次分析用配置
-- 分析请求时携带 `configText`，无需重复上传配置文件
+- `JDK 21`
+- `Maven 3.9+`
 
-### 2.2 批量上传备份
-
-- 上传备份支持多选 `*.zip`
-- 后端按批量入口统一解析并汇总
-- 线体视图展示多个机器人节点（名称取 `RobotInfo.robotName`）
-- 点击线体节点进入该机器人对应车型视图
-
-### 2.3 Excel 导出
-
-- 新增 `下载Excel` 按钮，对应接口：`POST /api/analysis/excel`
-- 一个线体（一次分析）导出一个 `.xlsx`
-- 每个机器人对应一个 Sheet
-- Sheet 内包含两部分：
-  - 树形调用结构（5 列分层）
-  - 调用关系矩阵（行调用方、列被调用方、箭头上溯）
-
----
-
-## 3. 核心能力
-
-- KRL 备份包解析（zip 内文件遍历、模块聚合、AST 构建）
-- 规则过滤（前缀/后缀、白名单/黑名单、大小写不敏感）
-- 调用链图可视化
-  - 线体信息视图（机器人级）
-  - 车型信息视图（调用链级）
-  - 单击高亮链路、双击看文件属性、右键看上下文
-- Excel 持久化导出（便于归档和跨平台转发）
-
----
-
-## 4. 系统架构
-
-```mermaid
-flowchart LR
-    A[前端页面<br/>index.html + app.js] -->|multipart/form-data| B[AnalysisController]
-    A -->|GET /api/config| C[ConfigStorageService]
-
-    B --> D[CarCallAnalysisService]
-    D --> E[KrlZipLoader]
-    D --> F[ModuleRepository + ModuleParser]
-    D --> G[CarCallReferenceAnalyze]
-    D --> H[RobotInfo]
-
-    B --> I[CallGraphExcelExportService]
-    I --> J[(xlsx bytes)]
-
-    C --> K[~/.KrlParser/Config.yml]
-    C --> L[krl-core/resources/config.yml]
-```
-
-### 模块分层
-
-- `krl-core`
-  - 解析与语义分析核心
-  - 调用关系构建与规则引擎
-- `krl-web`
-  - Spring Boot 启动与 API
-  - 配置文件托管
-  - Excel 导出
-  - 静态前端页面
-
----
-
-## 5. 目录结构（关键部分）
-
-```text
-KRLParser/
-├── krl-core/
-│   ├── src/main/resources/config.yml
-│   └── src/main/java/tech/waitforu/
-│       ├── loader/           # zip/yaml 读取
-│       ├── parser/           # AST 与调用关系分析
-│       ├── rule/             # IgnoreRuleByStr
-│       └── service/          # CarCallAnalysisService
-├── krl-web/
-│   └── src/main/
-│       ├── java/tech/waitforu/krlweb/
-│       │   ├── controller/   # /api/config /api/analysis /api/analysis/excel
-│       │   ├── config/       # ConfigStorageService
-│       │   └── service/      # CallGraphExcelExportService
-│       └── resources/
-│           ├── application.yml
-│           └── static/       # index.html + js/app.js + css
-└── README.md
-```
-
----
-
-## 6. 快速开始
-
-### 6.1 环境要求
-
-- JDK 21
-- Maven 3.9+
-
-### 6.2 本地运行（开发模式）
+### 本地桌面模式
 
 ```bash
 mvn -pl krl-web spring-boot:run
 ```
 
-默认访问：`http://localhost:2026`
+默认访问地址：`http://localhost:2026`
 
-### 6.3 打包
+### 本地验证服务器模式
+
+```bash
+KRL_RUNTIME_MODE=server mvn -pl krl-web spring-boot:run
+```
+
+### 打包
 
 ```bash
 mvn clean package
 ```
 
----
+### Docker / 服务器部署
 
-## 7. 使用流程
+完整部署步骤见 [deploy/README-server.md](deploy/README-server.md)。
 
-1. 点击 `上传备份(.zip)`，可选择 1~N 个 zip
-2. 点击 `Config` 查看/编辑本次分析配置
-3. 点击 `开始分析` 查看图谱
-4. 在线体视图点击机器人节点进入车型视图
-5. 点击 `下载Excel` 导出本次汇总结果
+## 使用流程
 
----
+1. 点击 `上传备份 (.zip)`，可一次选择 1~N 个备份包
+2. 点击 `Config` 查看或编辑本次分析所使用的配置
+3. 点击 `开始分析` 发起解析
+4. 在线体视图中查看机器人节点，并进入对应车型视图
+5. 在图谱视图或列表视图中查看调用关系
+6. 需要留档时点击 `下载Excel` 导出本次结果
 
-## 8. 配置机制说明
+交互补充：
 
-### 8.1 配置文件路径
+- 单击节点可高亮链路
+- 双击节点可查看文件属性
+- 右键可查看相关上下文
+- 移动端长按节点也可查看文件属性
 
-- 默认：`~/.KrlParser/Config.yml`
-- 可通过 `krl.config.path` 覆盖
+## 配置说明
 
-### 8.2 自动初始化
+### 默认路径
 
-- 若目标路径无配置文件，启动时自动从内置模板复制
-- 模板来源：`krl-core/src/main/resources/config.yml`
+- 配置文件：`~/.KrlParser/Config.yml`
+- 日志目录：`~/.KrlParser/logs/`
+- 临时目录：`~/.KrlParser/tmp/`
+- 结果目录：`~/.KrlParser/results/`
 
-### 8.3 规则语义
+### 自动初始化
 
-- 规则数组：`prefix` / `suffix`
-- `!xxx`：忽略（黑名单）
-- `xxx`：保留（白名单）
+- 启动时会检查配置文件是否存在
+- 若目标路径不存在配置文件，则自动从 `krl-core/src/main/resources/config.yml` 复制生成
+
+### 规则语义
+
+- 规则数组包括 `prefix` / `suffix`
+- `!xxx`：忽略该规则命中的内容
+- `xxx`：保留该规则命中的内容
 - `@SKIP@`：跳过该条规则
 - 匹配大小写不敏感
 
-### 8.4 关键配置项
+### 常用配置项
 
 - `robotInfo.filePath`：机器人信息 INI 文件路径
 - `fileLoadSection`：备份文件加载过滤规则
 - `carInvokerParseSection`：调用解析过滤规则
 
----
+### 常用环境变量
 
-## 9. API 说明
+- `KRL_RUNTIME_MODE`：运行模式，`desktop` 或 `server`
+- `KRL_CONFIG_PATH`：自定义配置文件路径
+- `KRL_LOG_DIR`：自定义日志目录
+- `KRL_STORAGE_TEMP_DIR`：服务器模式临时文件目录
+- `KRL_STORAGE_RESULT_DIR`：服务器模式结果目录
+- `KRL_TASK_RETENTION`：任务结果保留时长
+- `KRL_CLEANUP_INTERVAL`：过期任务清理间隔
+- `KRL_MAX_CONCURRENT_TASKS`：服务器模式最大并发任务数
+- `KRL_MAX_ACTIVE_TASKS`：服务器模式最大活动任务数
+- `KRL_MAX_FILE_SIZE` / `KRL_MAX_REQUEST_SIZE`：上传体积限制
+- `SERVER_ADDRESS` / `SERVER_PORT`：服务监听地址与端口
 
-### 9.1 读取配置
+## API 概览
+
+所有分析接口均使用 `multipart/form-data`，上传字段支持：
+
+- `files`：多个 zip 文件，推荐使用
+- `file`：单个 zip 文件，兼容旧前端
+- `configText`：前端在线编辑后的 YAML 文本
+
+### 运行状态
+
+- `GET /api/runtime/status`
+- 返回当前 `runtimeMode` 与 `analysisMode`
+
+### 配置读取
 
 - `GET /api/config`
-- 响应：
+- 返回配置文件路径与当前内容
 
-```json
-{
-  "configPath": "/Users/xxx/.KrlParser/Config.yml",
-  "content": "...yaml..."
-}
-```
+### 同步分析接口
 
-### 9.2 分析调用关系
+适用于 `desktop` 模式：
 
 - `POST /api/analysis`
-- `Content-Type: multipart/form-data`
-- 字段：
-  - `files`：多个 zip（推荐）
-  - `file`：单个 zip（兼容）
-  - `configText`：前端编辑后的 YAML 文本
-- 返回：`List<RobotInfo>`
-
-### 9.3 分析并导出 Excel
-
 - `POST /api/analysis/excel`
-- 入参与分析接口一致
-- 返回：`application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`
 
----
+### 异步任务接口
 
-## 10. Excel 设计说明
+适用于 `server` 模式：
 
-每个机器人一个 Sheet，结构如下：
+- `POST /api/analysis/tasks`：提交任务
+- `GET /api/analysis/tasks/{taskId}`：查询任务状态
+- `GET /api/analysis/tasks/{taskId}/result`：获取 JSON 结果
+- `GET /api/analysis/tasks/{taskId}/excel`：下载 Excel 结果
 
-1. 树形区（上半区）
-- 列顺序固定：`Cell程序 | P程序 | 车型代码 | 车型程序 | 轨迹程序`
+### 健康检查
+
+- `GET /actuator/health`
+
+## Excel 导出说明
+
+一次分析导出一个 `.xlsx` 文件，每个机器人对应一个 Sheet。
+
+### 树形调用结构
+
+- 列顺序固定为 `Cell程序 | P程序 | 车型代码 | 车型程序 | 轨迹程序`
 - 同层相邻重复值纵向合并
-- 类型按固定颜色填充
+- 不同类型使用固定颜色填充
 
-2. 关系矩阵区（下半区）
-- 行 = 调用方，列 = 被调用方
-- 若存在直接调用，在交叉单元格填入调用方名称
-- 同列顶部到首次直调单元格之间用 `↑` 指示
+### 调用关系矩阵
 
----
+- 行表示调用方，列表示被调用方
+- 若存在直接调用，在交叉单元格中填入调用方名称
+- 同列顶部到首次直调单元格之间使用 `↑` 指示上溯关系
 
-## 11. 常见问题
+## 项目结构
 
-### 11.1 为什么“下载Excel”按钮不可点击？
+```text
+KRLParser/
+├── krl-core/
+│   ├── src/main/java/tech/waitforu/
+│   │   ├── loader/      # zip/yaml 读取
+│   │   ├── parser/      # AST 构建与调用关系分析
+│   │   ├── rule/        # 过滤规则
+│   │   └── service/     # 分析与 Excel 导出核心服务
+│   └── src/main/resources/
+│       ├── krl.g4
+│       └── config.yml
+├── krl-web/
+│   └── src/main/
+│       ├── java/tech/waitforu/krlweb/
+│       │   ├── controller/  # runtime / analysis / task APIs
+│       │   ├── config/      # 运行模式与存储配置
+│       │   └── service/     # 同步执行与异步任务服务
+│       └── resources/
+│           ├── static/      # index.html / js / css / vendor
+│           └── application.yml
+├── deploy/
+│   ├── docker-compose.server.yml
+│   ├── Caddyfile.krl.example
+│   └── README-server.md
+└── README.md
+```
 
-前端按钮启用条件为：
-- 已选择至少一个 zip
-- 配置已成功加载（`/api/config` 成功）
+## 相关文档
 
-若按钮灰色：
-- 检查是否已上传 zip
-- 检查后端是否正常启动、`/api/config` 是否返回成功
-- 修改 JS 后请强制刷新浏览器缓存（`Ctrl/Cmd + Shift + R`）
+- [服务器部署说明](deploy/README-server.md)
+- [Docker Compose 部署文件](deploy/docker-compose.server.yml)
+- [Caddy 反向代理示例](deploy/Caddyfile.krl.example)
 
-### 11.2 配置编辑是长期生效还是临时生效？
+## 常见问题
 
-- 弹窗内“应用到本次分析”：临时生效（通过 `configText` 传给后端）
-- 想长期生效：直接编辑磁盘文件 `~/.KrlParser/Config.yml`
+### 为什么“下载Excel”按钮不可点击？
 
-### 11.3 日志在哪里？
+按钮启用依赖两个条件：
 
-默认日志目录：`~/.KrlParser/logs`
+- 已选择至少一个 zip 文件
+- 配置已成功加载
 
----
+如果按钮仍为灰色，请依次检查：
 
-## 12. 开发建议
+- 后端服务是否正常启动
+- `/api/config` 是否返回成功
+- 浏览器是否还在使用旧版静态资源，必要时强制刷新缓存
 
-- 新增节点类型时，需同步更新：
-  - 后端 `NodeType` 与 Excel 样式映射
-  - 前端节点样式与筛选面板
-- 调整配置规则时，优先通过 `Config` 弹窗快速验证
-- 若要扩展导出格式，可在 `CallGraphExcelExportService` 基础上新增策略类
+### 为什么界面上会出现任务状态标签？
 
----
-
-## 13. 免责声明
-
-- 解析结果依赖备份完整性与程序规范程度
-- 若现场程序包含非常规写法（重复 Case、动态拼接调用等），结果可能存在偏差
-- 建议将本工具输出作为工程分析辅助依据，并结合现场逻辑复核
+当应用运行在 `server` 模式时，前端会自动切换到异步任务链路，并显示运行模式与任务状态标签。
