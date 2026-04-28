@@ -1,4 +1,4 @@
-package tech.waitforu.antlr4;// Generated from /Users/liuke/IdeaProjects/KRLParser/src/main/resources/krl.g4 by ANTLR 4.13.2
+package tech.waitforu.antlr4;// Generated from krl.g4 by ANTLR 4.13.2
 
 import org.antlr.v4.runtime.tree.ParseTreeVisitor;
 

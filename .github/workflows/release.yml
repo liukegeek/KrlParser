@@ -16,8 +16,8 @@ permissions:
 
 # 工作任务定义
 jobs:
-  # 构建任务
-  build:
+  # 桌面版构建任务
+  build-desktop:
     # 任务名称：包含当前操作系统信息
     name: Build (${{ matrix.os }})
     # 运行环境：根据矩阵配置选择操作系统
@@ -185,12 +185,55 @@ jobs:
           path: |
             *.zip
 
+  # Docker 镜像构建任务
+  build-docker-image:
+    # 运行环境：Ubuntu（同时产出 linux/amd64 镜像资产）
+    runs-on: ubuntu-latest
+    steps:
+      # 步骤1：检出代码
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # 步骤2：构建并导出 Docker 镜像
+      - name: Build docker image archive
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          APP_NAME="KRLParser"
+          IMAGE_NAME="krlparser"
+
+          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+          else
+            VERSION="dev-${GITHUB_SHA::7}"
+          fi
+
+          docker build \
+            --tag "${IMAGE_NAME}:${VERSION}" \
+            --tag "${IMAGE_NAME}:latest" \
+            .
+
+          mkdir -p build/docker
+          docker save "${IMAGE_NAME}:${VERSION}" "${IMAGE_NAME}:latest" \
+            | gzip > "build/docker/${APP_NAME}-${VERSION}-linux-amd64-image.tar.gz"
+
+      # 步骤3：上传 Docker 镜像工件
+      - name: Upload docker artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-docker-image
+          path: |
+            build/docker/*.tar.gz
+
   # 发布任务
   release:
     # 仅当推送标签时执行此任务
     if: startsWith(github.ref, 'refs/tags/')
     # 依赖于build任务完成
-    needs: build
+    needs:
+      - build-desktop
+      - build-docker-image
     # 运行环境：Ubuntu
     runs-on: ubuntu-latest
     # 发布步骤
@@ -208,5 +251,7 @@ jobs:
       - name: Publish release assets
         uses: softprops/action-gh-release@v2
         with:
-          # 发布文件：artifacts目录下的所有ZIP文件
-          files: artifacts/**.zip
+          # 发布文件：桌面版 ZIP + Docker 镜像 tar.gz
+          files: |
+            artifacts/*.zip
+            artifacts/*.tar.gz
