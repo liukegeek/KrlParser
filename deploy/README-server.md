@@ -21,7 +21,7 @@ cp deploy/.env.example deploy/.env
 
 ### 2.1 下载镜像资产
 
-在 GitHub Releases 页面下载对应版本的 Linux 镜像资产：
+在 GitHub Releases 页面下载对应版本的 Linux 镜像包：
 
 - `KRLParser-<version>-linux-amd64-image.tar.gz`
 

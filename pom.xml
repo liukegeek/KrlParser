@@ -61,6 +61,18 @@
     </dependencyManagement>
 
     <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <inherited>false</inherited>
+                <configuration>
+                    <!-- 根项目只是聚合 POM，不是可启动的 Spring Boot 应用。 -->
+                    <skip>true</skip>
+                </configuration>
+            </plugin>
+        </plugins>
+
         <!-- 统一管理插件版本。写在pluginManagement中只会管理版本，但不会编译。子模块就不需要写 version、config等了 -->
         <pluginManagement>
             <plugins>
