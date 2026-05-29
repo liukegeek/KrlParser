@@ -128,7 +128,6 @@ public class CarCallReferenceAnalyze {
                                                     int majorIndexOfCar = Integer.parseInt(label);
                                                     KrlModule module = moduleRepository.findByCallableName(targetName);
                                                     CallNode pProgramNode = parsePProgram(module, targetName, majorIndexOfCar);
-                                                    pProgramNode.setRelevantInfo(caseBlock.getTextContent());
                                                     if (!cellNode.getChildren().contains(pProgramNode)) {
                                                         cellNode.addChild(pProgramNode);
                                                     }
@@ -168,6 +167,7 @@ public class CarCallReferenceAnalyze {
         String nodeValue = pProgramModule.getModuleName();
         NodeType nodeType = NodeType.P_PROGRAM;
         String id = nodeType + ":" + nodeValue;
+        String relevantInfo = krlRoot.getTextContent();
         CallNode pProgramNode;
 
         if (existingNodes.containsKey(id) && existingNodes.get(id) instanceof CallNode) {
@@ -175,7 +175,7 @@ public class CarCallReferenceAnalyze {
             // 注意，因为车型号(CarCodeNode)依赖于cell中不同case所传入的标签变量majorIndexOfCar，此时不一定遍历完cell中的所有case，该模块的车型号仍可能变动，故而不能像cell、carProgram节点一样直接return。
             pProgramNode = (CallNode) existingNodes.get(id);
         } else {
-            pProgramNode = new CallNode(id, nodeValue, nodeType, null);
+            pProgramNode = new CallNode(id, nodeValue, nodeType, relevantInfo);
             //设置结点的补充信息,关于模块文件的。
             this.setPropertyAboutFile(pProgramNode, pProgramModule);
         }
@@ -279,7 +279,6 @@ public class CarCallReferenceAnalyze {
 
                                                         //解析出车型程序的结点。
                                                         CallNode carProgramNode = parseCarProgram(module, targetName);
-                                                        carProgramNode.setRelevantInfo(caseBlock.getTextContent());
 
                                                         //将车型程序连接在车型码下面。将车型码连接在P程序的下面。
                                                         if (!carCodeNode.getChildren().contains(carProgramNode)) {
@@ -349,6 +348,7 @@ public class CarCallReferenceAnalyze {
 
         String nodeValue = carProgramModule.getModuleName();
         NodeType nodeType = NodeType.CAR_PROGRAM;
+        String relevantInfo = krlRoot.getTextContent();
         String id = nodeType + ":" + nodeValue;
 
         // 如果存在，直接返回已存在的carProgramNode节点。
@@ -356,7 +356,7 @@ public class CarCallReferenceAnalyze {
             return (CallNode) existingNodes.get(id);
         }
 
-        CallNode carProgramNode = new CallNode(id, nodeValue, nodeType, null);
+        CallNode carProgramNode = new CallNode(id, nodeValue, nodeType, relevantInfo);
         //设置结点的补充信息,关于模块文件的。
         this.setPropertyAboutFile(carProgramNode, carProgramModule);
 
@@ -383,14 +383,23 @@ public class CarCallReferenceAnalyze {
                         NodeType routNodeType = NodeType.ROUTE_PROCESS;
                         String routeNodeId = routNodeType + ":" + routeNodeValue;
                         CallNode routeProcessNode = new CallNode(routeNodeId, routeNodeValue, routNodeType, null);
+
                         //设置结点的补充信息,关于模块文件的。
                         KrlModule routeModule = moduleRepository.findByCallableName(targetName);
                         if (routeModule == null) {
                             throw new KrlParseException("解析出错，未找到轨迹程序对应模块: " + targetName);
                         }
                         this.setPropertyAboutFile(routeProcessNode, routeModule);
-                        // 轨迹相关上下文信息来源于当前调用表达式所在根语句文本。
-                        String routeNodeRelevantInfo = invocation.findRootNode().getTextContent();
+
+                        // 将轨迹程序的内容提取出来，添加到节点中，便于后续使用。
+                        // 这里没有直接通过src文件提取内容，是为了通过ModuleParser来过滤多余的注释，从而保持信息直观简洁
+                        ModuleParser routeModulkeParser = new ModuleParser(routeModule);
+                        AstNode routeAstNode = routeModulkeParser.getSrcAst();
+                        //判断解析是否正确。如果不是KrlRoot节点(包括为NULL)，抛出异常。同时如果routeAstNode是KrlRoot节点，将其转换为KrlRoot类型。
+                        if (!(routeAstNode instanceof KrlRoot routeProceeKrlRoot)) {
+                            throw new KrlParseException("解析出错，" + routeModule.getModuleName() + "模块中不存在KrlRoot节点");
+                        }
+                        String routeNodeRelevantInfo = routeProceeKrlRoot.getTextContent();
                         routeProcessNode.setRelevantInfo(routeNodeRelevantInfo);
 
                         if (!carProgramNode.getChildren().contains(routeProcessNode)) {
