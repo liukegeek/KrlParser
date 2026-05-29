@@ -44,6 +44,8 @@
 
 ![image-20260519002132805](https://obj.waitforu.tech/imgs%2Fblog%2F2026%2F05%2F19%2F002134-774a34c321776d748d4edb99aa80ab1b.webp)
 
+![image-20260529162820827](https://obj.waitforu.tech/imgs%2Fblog%2F2026%2F05%2F29%2F162824-998420fa77f4e0bc9d954dbc24479d15.webp)
+
 - 支持在线读取与编辑本次分析使用的 `Config.yml`，根据需求过滤分析噪音。
 
 ![image-20260519000604191](https://obj.waitforu.tech/imgs%2Fblog%2F2026%2F05%2F19%2F000606-cbe35cd3f4ba682086f025e18ec7e227.webp)
