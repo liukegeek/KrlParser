@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import tech.waitforu.exception.KrlConfigException;
 import tech.waitforu.krlweb.exception.BadRequestException;
+import tech.waitforu.krlweb.exception.ForbiddenException;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -40,6 +41,14 @@ class GlobalExceptionHandlerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.status").value(400))
                 .andExpect(jsonPath("$.message").value("参数错误"));
+    }
+
+    @Test
+    void shouldMapForbiddenExceptionToForbiddenStatus() throws Exception {
+        mockMvc.perform(get("/test/forbidden").accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.status").value(403))
+                .andExpect(jsonPath("$.message").value("禁止操作"));
     }
 
     /**
@@ -90,6 +99,11 @@ class GlobalExceptionHandlerTest {
         @GetMapping("/api-exception")
         String apiException() {
             throw new BadRequestException("参数错误");
+        }
+
+        @GetMapping("/forbidden")
+        String forbiddenException() {
+            throw new ForbiddenException("禁止操作");
         }
 
         /**
