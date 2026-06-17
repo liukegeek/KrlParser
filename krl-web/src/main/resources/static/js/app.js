@@ -62,6 +62,7 @@ const dom = {
     configButton: document.getElementById('configButton'),
     startAnalysisBtn: document.getElementById('startAnalysisBtn'),
     downloadExcelBtn: document.getElementById('downloadExcelBtn'),
+    shutdownButton: document.getElementById('shutdownButton'),
     statusBlock: document.getElementById('statusBlock'),
     runtimeStatusBadge: document.getElementById('runtimeStatusBadge'),
     taskStatusBadge: document.getElementById('taskStatusBadge'),
@@ -69,6 +70,7 @@ const dom = {
     loaderText: document.getElementById('loaderText'),
     configModal: document.getElementById('configModal'),
     configCloseBtn: document.getElementById('configCloseBtn'),
+    configResetBtn: document.getElementById('configResetBtn'),
     configReloadBtn: document.getElementById('configReloadBtn'),
     configApplyBtn: document.getElementById('configApplyBtn'),
     configTextarea: document.getElementById('configTextarea'),
@@ -245,6 +247,7 @@ function refreshModeSpecificUi() {
     const showRuntimeBadge = runtimeState.runtimeMode === 'server';
     const showTaskBadge = isAsyncAnalysisMode();
     const showStatusBlock = showRuntimeBadge || showTaskBadge;
+    const showDesktopActions = runtimeState.runtimeMode === 'desktop';
 
     if (dom.statusBlock) {
         dom.statusBlock.classList.toggle('hidden', !showStatusBlock);
@@ -255,6 +258,9 @@ function refreshModeSpecificUi() {
     if (dom.taskStatusBadge) {
         dom.taskStatusBadge.classList.toggle('hidden', !showTaskBadge);
     }
+    [dom.configResetBtn, dom.shutdownButton].forEach((button) => {
+        button?.classList.toggle('hidden', !showDesktopActions);
+    });
 }
 
 /**
@@ -1554,6 +1560,7 @@ function bindPageEvents() {
             alert(error.message || '重载配置失败');
         }
     });
+    dom.configResetBtn?.addEventListener('click', resetConfigToDefault);
     dom.configApplyBtn?.addEventListener('click', () => {
         uploadState.configContent = dom.configTextarea.value || '';
         uploadState.lastSuccessfulTaskId = null;
@@ -1571,6 +1578,7 @@ function bindPageEvents() {
         setHeaderMenuOpen(false);
         runDownloadByMode();
     });
+    dom.shutdownButton?.addEventListener('click', shutdownApplication);
     dom.btnLineView?.addEventListener('click', () => switchView('line'));
     dom.btnCarView?.addEventListener('click', () => switchView('car'));
     dom.btnGraphMode?.addEventListener('click', () => switchRenderMode('graph'));
@@ -1654,6 +1662,15 @@ function bindPageEvents() {
 /**
  * 读取服务器上的配置文件内容。
  */
+function applyConfigPayload(payload) {
+    uploadState.configPath = payload.configPath || '';
+    uploadState.configContent = payload.content || '';
+    uploadState.configLoaded = true;
+    dom.configPathText.textContent = uploadState.configPath || '--';
+    dom.configTextarea.value = uploadState.configContent;
+    updateActionButtons();
+}
+
 async function loadConfigFromServer() {
     const response = await apiFetch('/api/config');
     if (!response.ok) {
@@ -1661,12 +1678,55 @@ async function loadConfigFromServer() {
         throw new Error(`读取配置失败: ${message}`);
     }
     const payload = await response.json();
-    uploadState.configPath = payload.configPath || '';
-    uploadState.configContent = payload.content || '';
-    uploadState.configLoaded = true;
-    dom.configPathText.textContent = uploadState.configPath || '--';
-    dom.configTextarea.value = uploadState.configContent || '';
-    updateActionButtons();
+    applyConfigPayload(payload);
+}
+
+async function resetConfigToDefault() {
+    if (!window.confirm('此操作将覆盖磁盘中的 Config.yml，是否继续？')) {
+        return;
+    }
+    dom.configResetBtn.disabled = true;
+    setLoading(true, '正在初始化配置...');
+    try {
+        const response = await apiFetch('/api/config/reset', {method: 'POST'});
+        if (!response.ok) {
+            const message = await extractErrorMessage(response);
+            throw new Error(`初始化配置失败: ${message}`);
+        }
+        applyConfigPayload(await response.json());
+        uploadState.lastSuccessfulTaskId = null;
+        uploadState.lastSuccessfulSignature = null;
+        setTaskBadge('配置已初始化，等待分析', 'info');
+        alert('配置文件已恢复为默认内容。');
+    } catch (error) {
+        console.error(error);
+        alert(error.message || '初始化配置失败');
+    } finally {
+        dom.configResetBtn.disabled = false;
+        setLoading(false, '');
+    }
+}
+
+async function shutdownApplication() {
+    if (!window.confirm('退出后正在执行的分析将被终止，是否继续？')) {
+        return;
+    }
+    dom.shutdownButton.disabled = true;
+    setHeaderMenuOpen(false);
+    setLoading(true, '正在退出程序...');
+    try {
+        const response = await apiFetch('/api/runtime/shutdown', {method: 'POST'});
+        if (!response.ok) {
+            const message = await extractErrorMessage(response);
+            throw new Error(`退出程序失败: ${message}`);
+        }
+        setLoading(true, '程序已退出，可以关闭此页面。');
+    } catch (error) {
+        console.error(error);
+        dom.shutdownButton.disabled = false;
+        setLoading(false, '');
+        alert(error.message || '退出程序失败');
+    }
 }
 
 /**

@@ -1,6 +1,7 @@
 package tech.waitforu.krlweb.config;
 
 import jakarta.annotation.PostConstruct;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -42,6 +43,7 @@ public class ConfigStorageService {
      *
      * @param configPathValue 配置路径（支持从配置项注入）
      */
+    @Autowired
     public ConfigStorageService(@Value("${krl.config.path:${user.home}/.KrlParser/Config.yml}") String configPathValue) {
         this(Path.of(configPathValue), new ClassPathResource("config.yml"));
     }

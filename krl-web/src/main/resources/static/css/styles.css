@@ -262,6 +262,16 @@ button {
     background: #ea580c;
 }
 
+.toolbar-button.danger {
+    background: #dc2626;
+    color: #ffffff;
+    box-shadow: 0 12px 26px rgba(220, 38, 38, 0.2);
+}
+
+.toolbar-button.danger:hover:not(:disabled) {
+    background: #b91c1c;
+}
+
 .toolbar-button:disabled,
 .action-disabled {
     cursor: not-allowed;

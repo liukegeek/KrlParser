@@ -56,6 +56,11 @@
                         <i data-lucide="download"></i>
                         <span>下载Excel</span>
                     </button>
+
+                    <button id="shutdownButton" type="button" class="toolbar-button danger toolbar-item desktop-only-action hidden">
+                        <i data-lucide="power"></i>
+                        <span>退出程序</span>
+                    </button>
                 </div>
 
                 <div id="statusBlock" class="status-block hidden">
@@ -239,6 +244,10 @@
                 <div id="configPathText" class="modal-path">--</div>
                 <textarea id="configTextarea" class="config-textarea"></textarea>
                 <div class="modal-actions">
+                    <button id="configResetBtn" type="button" class="toolbar-button warning small-button desktop-only-action hidden">
+                        <i data-lucide="rotate-ccw"></i>
+                        <span>初始化配置</span>
+                    </button>
                     <button id="configReloadBtn" type="button" class="toolbar-button secondary small-button">
                         <i data-lucide="refresh-ccw"></i>
                         <span>从磁盘重新加载</span>
