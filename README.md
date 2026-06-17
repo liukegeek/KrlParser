@@ -123,6 +123,7 @@ KRL_RUNTIME_MODE=server mvn -pl krl-web -am spring-boot:run
 4. 在线体视图中查看机器人节点，并进入对应车型视图
 5. 在图谱视图或列表视图中查看调用关系
 6. 需要留档时点击 `下载Excel` 导出本次结果
+7. 桌面模式使用完毕后，可点击 `退出程序` 关闭后台 Java 进程
 
 ![image-20260521000502128](https://obj.waitforu.tech/imgs%2Fblog%2F2026%2F05%2F21%2F000504-257f582ad5aadd00c312b12f33fe6320.webp)
 
@@ -146,6 +147,7 @@ KRL_RUNTIME_MODE=server mvn -pl krl-web -am spring-boot:run
 
 - 启动时会检查配置文件是否存在
 - 若目标路径不存在配置文件，则自动从 `krl-core/src/main/resources/config.yml` 复制生成
+- 桌面模式可在 Config 编辑器中点击 `初始化配置`，将磁盘配置恢复为应用内置默认内容；服务器模式不提供该操作
 
 ### 规则语义
 
