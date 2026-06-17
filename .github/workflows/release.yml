@@ -168,7 +168,7 @@ jobs:
           fi
           
           cp "$JAR_PATH" build/input/app.jar
-          
+
           jpackage \
             --type app-image \
             --name "$APP_NAME" \
@@ -178,7 +178,46 @@ jobs:
             --icon "$ICON_PATH" \
             --vendor "WaitForU" \
             --dest build/dist
-          
+
+          if [[ "${{ runner.os }}" == "Windows" ]]; then
+            APP_EXECUTABLE="$PWD/build/dist/${APP_NAME}/${APP_NAME}.exe"
+          else
+            APP_EXECUTABLE="$PWD/build/dist/${APP_NAME}.app/Contents/MacOS/${APP_NAME}"
+          fi
+
+          SMOKE_PORT=18080
+          SMOKE_OUTPUT="$PWD/build/desktop-smoke-test.log"
+          (
+            cd /
+            exec "$APP_EXECUTABLE" \
+              --server.address=127.0.0.1 \
+              --server.port="$SMOKE_PORT" \
+              --krl.runtime.mode=server
+          ) >"$SMOKE_OUTPUT" 2>&1 &
+          SMOKE_PID=$!
+
+          for _ in {1..45}; do
+            if curl --fail --silent "http://127.0.0.1:${SMOKE_PORT}/actuator/health" | grep -q '"status":"UP"'; then
+              SMOKE_OK=1
+              break
+            fi
+
+            if ! kill -0 "$SMOKE_PID" 2>/dev/null; then
+              break
+            fi
+
+            sleep 1
+          done
+
+          kill "$SMOKE_PID" 2>/dev/null || true
+          wait "$SMOKE_PID" 2>/dev/null || true
+
+          if [[ "${SMOKE_OK:-0}" != "1" ]]; then
+            echo "Desktop app image smoke test failed." >&2
+            sed -n '1,240p' "$SMOKE_OUTPUT" || true
+            exit 1
+          fi
+
           if [[ "${{ runner.os }}" == "Windows" ]]; then
             (
               cd build/dist

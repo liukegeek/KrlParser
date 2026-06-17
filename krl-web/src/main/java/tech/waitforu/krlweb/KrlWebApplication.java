@@ -2,10 +2,8 @@ package tech.waitforu.krlweb;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.config.YamlPropertiesFactoryBean;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.core.io.ClassPathResource;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import tech.waitforu.krlweb.config.RuntimeMode;
 
@@ -13,7 +11,6 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
-import java.util.Properties;
 
 /**
  * KRL Web 应用启动入口。
@@ -25,6 +22,8 @@ import java.util.Properties;
 @SpringBootApplication
 @EnableScheduling
 public class KrlWebApplication {
+    private static final String DEFAULT_RUNTIME_MODE = "desktop";
+    private static final String DEFAULT_SERVER_PORT = "2026";
     private static final Logger LOGGER = LoggerFactory.getLogger(KrlWebApplication.class);
     private static volatile String bootstrapWarningMessage;
 
@@ -70,42 +69,29 @@ public class KrlWebApplication {
      * 解析启动期必须用到的基础配置。
      * <p>
      * 这里不能依赖 Spring Environment，因为在 `SpringApplication.run` 之前，
-     * Spring 容器尚未完成初始化。为此需要手动按“命令行参数 -> JVM 参数 -> 环境变量 -> application.yml”顺序解析。
+     * Spring 容器尚未完成初始化。为此需要手动按“命令行参数 -> JVM 参数 -> 环境变量 -> 默认值”顺序解析。
+     * 不能直接读取 application.yml 作为默认值，因为此时其中的 Spring 占位符尚未解析。
      *
      * @param args 启动参数
      * @return 启动期基础配置
      */
     private static BootstrapSettings resolveBootstrapSettings(String[] args) {
-        Properties yamlProperties = loadApplicationYamlProperties();
         String runtimeModeValue = resolveBootstrapProperty(args, "krl.runtime.mode", "KRL_RUNTIME_MODE",
-                yamlProperties.getProperty("krl.runtime.mode", "desktop"));
+                DEFAULT_RUNTIME_MODE);
         String portValue = resolveBootstrapProperty(args, "server.port", "SERVER_PORT",
-                yamlProperties.getProperty("server.port", "2026"));
+                DEFAULT_SERVER_PORT);
         String logDir = resolveBootstrapProperty(args, "krl.log.dir", "KRL_LOG_DIR",
-                yamlProperties.getProperty("krl.log.dir",
-                        Path.of(System.getProperty("user.home", "."), ".KrlParser", "logs").toString()));
+                getDefaultLogDirectory().toString());
 
         int port;
         try {
             port = Integer.parseInt(portValue);
         } catch (NumberFormatException exception) {
-            bootstrapWarningMessage = "启动端口配置无效，已回退到默认端口 2026";
-            port = 2026;
+            bootstrapWarningMessage = "启动端口配置无效，已回退到默认端口 " + DEFAULT_SERVER_PORT;
+            port = Integer.parseInt(DEFAULT_SERVER_PORT);
         }
         return new BootstrapSettings(RuntimeMode.from(runtimeModeValue), port,
                 Path.of(logDir).toAbsolutePath().normalize().toString());
-    }
-
-    /**
-     * 读取 `application.yml` 中的默认属性。
-     *
-     * @return YAML 转换后的属性对象
-     */
-    private static Properties loadApplicationYamlProperties() {
-        YamlPropertiesFactoryBean yaml = new YamlPropertiesFactoryBean();
-        yaml.setResources(new ClassPathResource("application.yml"));
-        Properties properties = yaml.getObject();
-        return properties != null ? properties : new Properties();
     }
 
     /**
@@ -154,13 +140,17 @@ public class KrlWebApplication {
         String envLogDir = System.getenv("KRL_LOG_DIR");
         Path logDir = envLogDir != null && !envLogDir.isBlank()
                 ? Path.of(envLogDir)
-                : Path.of(System.getProperty("user.home", "."), ".KrlParser", "logs");
+                : getDefaultLogDirectory();
         try {
             Files.createDirectories(logDir);
         } catch (IOException exception) {
             bootstrapWarningMessage = "创建日志目录失败，将继续尝试使用该目录: " + logDir.toAbsolutePath().normalize();
         }
         System.setProperty("log.dir", logDir.toAbsolutePath().normalize().toString());
+    }
+
+    private static Path getDefaultLogDirectory() {
+        return Path.of(System.getProperty("user.home", "."), ".KrlParser", "logs");
     }
 
     /**
